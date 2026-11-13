@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logtopus - Physical AI Active Ceiling & Cube Storage Simulator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#06b6d4',
+              600: '#0891b2',
+              dark: '#030712',
+              card: '#0f172a',
+              border: '#1e293b',
+              accent: '#f59e0b',
+              neon: '#00f2fe'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      background-color: #030712;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #1e293b;
+      border-radius: 9999px;
+      height: 6px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #00f2fe;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 242, 254, 0.6);
+      transition: all 0.15s ease-in-out;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #38bdf8;
+    }
+  </style>
+</head>
+<body class="bg-gray-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3 sm:px-6">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-sky-400 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <span>LOGTOPUS</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-medium">Physical AI Cube Grid</span>
+            </h1>
+          </div>
+          <p class="text-xs text-slate-400">Active Ceiling Infrastructure · Single-SKU Storage Stacks · Multi-SKU Shipment Pallets</p>
+        </div>
+      </div>
+
+      <div class="flex items-center flex-wrap gap-2 text-xs">
+        <button id="btnRandomizeStacks" class="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 rounded-lg px-3 py-1.5 font-medium transition shadow-sm">
+          <span>🎲 Randomize Stack Heights & SKUs</span>
+        </button>
+        <button id="btnOpenReference" class="flex items-center gap-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 rounded-lg px-3 py-1.5 font-medium transition shadow-sm">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <span>Deck Reference (Slide 9)</span>
+        </button>
+        <div class="flex items-center gap-2 bg-slate-800/90 border border-slate-700/60 rounded-lg px-3 py-1.5 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>24/7 Grid-Powered (Zero Batteries)</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Modal: Reference Image from Presentation Slide 9 -->
+  <div id="modalReference" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full p-5 shadow-2xl relative flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <span>Logtopus Architecture Overview (Presentation Slide 9)</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700/50">Competitive Differentiation</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Continuous Active Ceiling grid spanning across single-SKU storage stacks and multi-SKU order-consolidation staging pallets</p>
+        </div>
+        <button id="btnCloseReference" class="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- High-Resolution Vector Schematic Diagram of Slide 9 Architecture -->
+      <div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-4 flex items-center justify-center">
+        <svg viewBox="0 0 800 360" class="w-full h-auto max-h-[420px]">
+          <defs>
+            <linearGradient id="gridBeam" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#00f2fe" />
+              <stop offset="100%" stop-color="#0284c7" />
+            </linearGradient>
+          </defs>
+          <rect width="800" height="360" fill="#030712" rx="12" />
+          <!-- Overhead Active Ceiling Rail Bar -->
+          <rect x="40" y="42" width="720" height="14" fill="url(#gridBeam)" rx="4" />
+          <text x="400" y="30" text-anchor="middle" fill="#38bdf8" font-size="13" font-weight="bold" font-family="Inter, sans-serif">CONTINUOUS ELECTRIFIED ACTIVE CEILING GRID (X/Y RAILS)</text>
+          <!-- Articulated Overhead Robots -->
+          <g transform="translate(160, 58)">
+            <rect x="0" y="0" width="24" height="14" fill="#f59e0b" rx="2" />
+            <rect x="28" y="0" width="24" height="14" fill="#00f2fe" rx="2" />
+            <rect x="56" y="0" width="24" height="14" fill="#00f2fe" rx="2" />
+            <line x1="40" y1="14" x2="40" y2="62" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 2" />
+            <rect x="22" y="62" width="36" height="24" fill="#8b5cf6" rx="2" stroke="#c4b5fd" stroke-width="1" />
+          </g>
+          <g transform="translate(530, 58)">
+            <rect x="0" y="0" width="24" height="14" fill="#f59e0b" rx="2" />
+            <rect x="28" y="0" width="24" height="14" fill="#00f2fe" rx="2" />
+            <rect x="56" y="0" width="24" height="14" fill="#00f2fe" rx="2" />
+            <line x1="40" y1="14" x2="40" y2="128" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 2" />
+            <rect x="22" y="128" width="36" height="24" fill="#10b981" rx="2" stroke="#6ee7b7" stroke-width="1" />
+          </g>
+          <!-- Zone A: Homogeneous Single-SKU Storage Stacks -->
+          <g transform="translate(65, 140)">
+            <!-- Stack 1 (Blue SKU) -->
+            <rect x="0" y="96" width="48" height="28" fill="#2563eb" rx="2" />
+            <rect x="0" y="64" width="48" height="28" fill="#2563eb" rx="2" />
+            <rect x="0" y="32" width="48" height="28" fill="#2563eb" rx="2" />
+            <rect x="0" y="0"  width="48" height="28" fill="#2563eb" rx="2" />
+            <!-- Stack 2 (Amber SKU) -->
+            <rect x="54" y="96" width="48" height="28" fill="#f59e0b" rx="2" />
+            <rect x="54" y="64" width="48" height="28" fill="#f59e0b" rx="2" />
+            <rect x="54" y="32" width="48" height="28" fill="#f59e0b" rx="2" />
+            <!-- Stack 3 (Emerald SKU) -->
+            <rect x="108" y="96" width="48" height="28" fill="#10b981" rx="2" />
+            <rect x="108" y="64" width="48" height="28" fill="#10b981" rx="2" />
+            <rect x="108" y="32" width="48" height="28" fill="#10b981" rx="2" />
+            <rect x="108" y="0"  width="48" height="28" fill="#10b981" rx="2" />
+            <!-- Stack 4 (Rose SKU) -->
+            <rect x="162" y="96" width="48" height="28" fill="#ec4899" rx="2" />
+            <rect x="162" y="64" width="48" height="28" fill="#ec4899" rx="2" />
+            <!-- Stack 5 (Cyan SKU) -->
+            <rect x="216" y="96" width="48" height="28" fill="#06b6d4" rx="2" />
+            <rect x="216" y="64" width="48" height="28" fill="#06b6d4" rx="2" />
+            <rect x="216" y="32" width="48" height="28" fill="#06b6d4" rx="2" />
+            <!-- Stack 6 (Red SKU) -->
+            <rect x="270" y="96" width="48" height="28" fill="#ef4444" rx="2" />
+            <rect x="270" y="64" width="48" height="28" fill="#ef4444" rx="2" />
+            <rect x="270" y="32" width="48" height="28" fill="#ef4444" rx="2" />
+            <rect x="270" y="0"  width="48" height="28" fill="#ef4444" rx="2" />
+          </g>
+          <text x="225" y="305" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="bold" font-family="Inter, sans-serif">ZONE A: SINGLE-SKU STORAGE STACKS</text>
+          <text x="225" y="323" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter, sans-serif">Each vertical column = 1 uniform product color</text>
+          <!-- Zone Divider -->
+          <line x1="430" y1="60" x2="430" y2="280" stroke="#10b981" stroke-width="2" stroke-dasharray="6 4" />
+          <!-- Zone B: Multi-SKU Consolidated Pallets -->
+          <g transform="translate(480, 204)">
+            <!-- Pallet 1 -->
+            <rect x="0" y="56" width="104" height="10" fill="#78350f" rx="2" />
+            <rect x="2" y="28" width="48" height="26" fill="#2563eb" rx="2" />
+            <rect x="54" y="28" width="48" height="26" fill="#f59e0b" rx="2" />
+            <rect x="2" y="0" width="48" height="26" fill="#ec4899" rx="2" />
+            <rect x="54" y="0" width="48" height="26" fill="#8b5cf6" rx="2" />
+            <!-- Pallet 2 -->
+            <rect x="140" y="56" width="104" height="10" fill="#78350f" rx="2" />
+            <rect x="142" y="28" width="48" height="26" fill="#ef4444" rx="2" />
+            <rect x="194" y="28" width="48" height="26" fill="#06b6d4" rx="2" />
+            <rect x="142" y="0" width="48" height="26" fill="#84cc16" rx="2" />
+            <rect x="194" y="0" width="48" height="26" fill="#f97316" rx="2" />
+          </g>
+          <text x="600" y="305" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="bold" font-family="Inter, sans-serif">ZONE B: MULTI-SKU SHIPMENT PALLETS</text>
+          <text x="600" y="323" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter, sans-serif">Every box on a pallet = distinct product color</text>
+        </svg>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+        <div class="flex items-start gap-2">
+          <span class="text-cyan-400 font-bold text-sm">🧩</span>
+          <div>
+            <strong class="text-slate-100">Homogeneous Single-SKU Storage Columns:</strong>
+            <p class="text-slate-400 mt-0.5">Every vertical stack in the storage cube holds a single product type (uniform color per stack), while different stacks hold different SKUs (distinct colors across columns) eliminating digging/reshuffling.</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="text-amber-400 font-bold text-sm">🐍</span>
+          <div>
+            <strong class="text-slate-100">Multi-Product Order Consolidation on Pallets:</strong>
+            <p class="text-slate-400 mt-0.5">Overhead snake robots pick individual SKUs from their dedicated storage stacks and assemble mixed-product customer shipments directly onto staging pallets (every box on a pallet has a distinct color).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- 3D Viewport Column (8 cols on large screens) -->
+    <div class="lg:col-span-8 flex flex-col gap-4">
+      <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col min-h-[480px] sm:min-h-[560px]">
+        
+        <!-- Viewport Top Overlay Toolbar -->
+        <div class="absolute top-3 inset-x-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+          <div class="flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md border border-slate-800 rounded-xl p-1 pointer-events-auto">
+            <button id="btnViewIso" class="px-3 py-1 text-xs rounded-lg font-medium transition bg-cyan-600 text-white shadow-sm">3D Perspective</button>
+            <button id="btnViewTop" class="px-3 py-1 text-xs rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:text-white">Top View (Ceiling Grid)</button>
+            <button id="btnViewFront" class="px-3 py-1 text-xs rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:text-white">Front Elevation</button>
+          </div>
+
+          <div class="flex items-center gap-2 pointer-events-auto bg-slate-950/80 backdrop-blur-md border border-slate-800 rounded-xl px-3 py-1 text-xs text-slate-300">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkGlow" checked class="rounded border-slate-700 text-cyan-500 focus:ring-0">
+              <span>Highlight Power Busbars</span>
+            </label>
+            <span class="text-slate-600">|</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkShowGaps" checked class="rounded border-slate-700 text-cyan-500 focus:ring-0">
+              <span>Show Overhead Rail Grid</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ThreeJS Canvas Container -->
+        <div id="canvasContainer" class="w-full flex-1 relative bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 cursor-grab active:cursor-grabbing">
+          <!-- 3D Canvas injected by script -->
+        </div>
+
+        <!-- Viewport Bottom Zone Indicators Bar -->
+        <div class="bg-slate-950/90 border-t border-slate-800/80 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+          <div class="flex items-center flex-wrap gap-4">
+            <div class="flex items-center gap-1.5">
+              <span class="inline-block w-2.5 h-2.5 rounded-sm bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+              <span>Articulated Overhead Robot (X/Y Rail Motion)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-block w-2.5 h-2.5 rounded-sm bg-blue-600 border border-blue-400"></span>
+              <span>Storage Stacks (1 Uniform Color = 1 Product SKU per Stack)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-block w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-amber-400 via-emerald-400 to-pink-500"></span>
+              <span>Staging Pallets (Multi-Color = Mixed-SKU Shipment)</span>
+            </div>
+          </div>
+          <div class="text-slate-500 text-[11px] hidden sm:block">
+            * Drag to orbit | Scroll to zoom | Right-click to pan
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Metrics Cards (4 columns) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <!-- Metric 1: Volume Utilization -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-16 h-16 bg-cyan-500/5 rounded-full blur-xl pointer-events-none"></div>
+          <div class="text-[11px] text-slate-400 font-medium">Cube Volume Utilization</div>
+          <div class="mt-1 flex items-baseline gap-1.5">
+            <span id="metricVolume" class="text-2xl font-extrabold text-cyan-400 mono">91.2%</span>
+            <span class="text-[11px] text-emerald-400 font-semibold">Zero Digging</span>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">1 dedicated SKU per vertical stack</div>
+        </div>
+
+        <!-- Metric 2: Capacity -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 relative overflow-hidden">
+          <div class="text-[11px] text-slate-400 font-medium">Active Storage Units</div>
+          <div class="mt-1 flex items-baseline gap-1.5">
+            <span id="metricCapacity" class="text-2xl font-extrabold text-white mono">195</span>
+            <span class="text-[11px] text-slate-400">Bins</span>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1" id="metricSkuSub">48 distinct SKU stacks</div>
+        </div>
+
+        <!-- Metric 3: Box Size -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 relative overflow-hidden">
+          <div class="text-[11px] text-slate-400 font-medium">Active Container Footprint</div>
+          <div class="mt-1 flex items-baseline gap-1.5">
+            <span id="metricBoxSize" class="text-xl sm:text-2xl font-extrabold text-emerald-400 mono">1m × 1m</span>
+          </div>
+          <div id="metricBoxSub" class="text-[10px] text-slate-500 mt-1">Full Pallet Container (1 per layer)</div>
+        </div>
+
+        <!-- Metric 4: Throughput -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 relative overflow-hidden">
+          <div class="text-[11px] text-slate-400 font-medium">Estimated System Throughput</div>
+          <div class="mt-1 flex items-baseline gap-1.5">
+            <span id="metricThroughput" class="text-2xl font-extrabold text-amber-400 mono">520</span>
+            <span class="text-[11px] text-slate-400">Cycles / hr</span>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">Multi-SKU shipment consolidation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls & Configuration Column (4 cols on large screens) -->
+    <div class="lg:col-span-4 flex flex-col gap-4">
+      
+      <!-- Sliders Control Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+        
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+            </svg>
+            <span>Grid, Container & Fleet Configuration</span>
+          </h2>
+          <button id="btnReset" class="text-xs text-slate-400 hover:text-cyan-400 transition underline underline-offset-4">Reset Defaults</button>
+        </div>
+
+        <!-- Control 0: Box Dimensions Selector (3 Sizes) -->
+        <div class="flex flex-col gap-2 pb-2 border-b border-slate-800/80">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Container Footprint Size (Meters)</span>
+            <span id="valBoxSizeLabel" class="mono text-emerald-400 font-bold bg-slate-800 px-2 py-0.5 rounded">1m × 1m</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="btnSize1x1" class="px-2 py-2 rounded-lg text-xs font-semibold transition border bg-cyan-600 text-white border-cyan-400 shadow-sm">
+              1m × 1m
+            </button>
+            <button id="btnSize1x05" class="px-2 py-2 rounded-lg text-xs font-semibold transition border bg-slate-800 text-slate-300 border-slate-700 hover:text-white">
+              1m × 0.5m
+            </button>
+            <button id="btnSize05x05" class="px-2 py-2 rounded-lg text-xs font-semibold transition border bg-slate-800 text-slate-300 border-slate-700 hover:text-white">
+              0.5m × 0.5m
+            </button>
+          </div>
+        </div>
+
+        <!-- Slider 1: Rubik's Cube Columns (X) -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Storage Cube Width (X-Axis Columns)</span>
+            <span id="valGridX" class="mono text-cyan-400 font-bold bg-slate-800 px-2 py-0.5 rounded">6 Cols</span>
+          </div>
+          <input type="range" id="sliderGridX" min="3" max="12" value="6" step="1">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>3 Cols</span>
+            <span>Zero-Gap Contiguous Cube</span>
+            <span>12 Cols</span>
+          </div>
+        </div>
+
+        <!-- Slider 2: Rubik's Cube Depth (Y) -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Storage Cube Depth (Y-Axis Rows)</span>
+            <span id="valGridY" class="mono text-cyan-400 font-bold bg-slate-800 px-2 py-0.5 rounded">8 Rows</span>
+          </div>
+          <input type="range" id="sliderGridY" min="4" max="14" value="8" step="1">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>4 Rows</span>
+            <span>High-Density Array</span>
+            <span>14 Rows</span>
+          </div>
+        </div>
+
+        <!-- Slider 3: Staging Area Ratio -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Operational & Staging Zone Ratio</span>
+            <span id="valStagingRatio" class="mono text-emerald-400 font-bold bg-slate-800 px-2 py-0.5 rounded">35% of Grid</span>
+          </div>
+          <input type="range" id="sliderStagingRatio" min="20" max="55" value="35" step="5">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>20% Compact</span>
+            <span>Balanced Buffer</span>
+            <span>55% Expanded</span>
+          </div>
+        </div>
+
+        <!-- Slider 4: Max Height / Layers (Z) -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Max Vertical Stack Height (Tiers)</span>
+            <span id="valHeight" class="mono text-cyan-400 font-bold bg-slate-800 px-2 py-0.5 rounded">6 Tiers</span>
+          </div>
+          <input type="range" id="sliderHeight" min="3" max="8" value="6" step="1">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>3 Tiers</span>
+            <span>Variable Stack Profile</span>
+            <span>8 Tiers</span>
+          </div>
+        </div>
+
+        <!-- Slider 5: Active Horizontal Snake Bots -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Active Overhead Robot Fleet</span>
+            <span id="valBots" class="mono text-amber-400 font-bold bg-slate-800 px-2 py-0.5 rounded">4 Robots</span>
+          </div>
+          <input type="range" id="sliderBots" min="1" max="8" value="4" step="1">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>1 Unit</span>
+            <span>Swarm Orchestration</span>
+            <span>8 Units</span>
+          </div>
+        </div>
+
+        <!-- Slider 6: Motion Speed -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-300">Simulation Speed Multiplier</span>
+            <span id="valSpeed" class="mono text-cyan-400 font-bold bg-slate-800 px-2 py-0.5 rounded">1.0x</span>
+          </div>
+          <input type="range" id="sliderSpeed" min="0.3" max="2.5" value="1.0" step="0.1">
+        </div>
+
+      </div>
+
+      <!-- Architectural Concept Card -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 flex flex-col gap-2.5">
+        <div class="font-bold text-white flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          <span>Core Architectural Principles:</span>
+        </div>
+        <div class="space-y-2 text-slate-400 leading-relaxed">
+          <p>
+            <strong class="text-cyan-300">1. Homogeneous SKU Storage Stacks:</strong> Each vertical stack in the storage cube holds a single product SKU (uniform color per stack, distinct color per stack), eliminating bin reshuffling ("zero digging").
+          </p>
+          <p>
+            <strong class="text-amber-300">2. Multi-SKU Order Consolidation on Pallets:</strong> Stacks on the staging pallets represent outbound customer shipments composed of multiple products—every box on a pallet has its own distinct product color.
+          </p>
+          <p>
+            <strong class="text-emerald-300">3. Orthogonal Rail Navigation & Hoist Delivery:</strong> Articulated overhead robots travel strictly along X/Y ceiling rails and lower picked SKUs directly onto the multi-product shipment pallets.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Interactive 3D Simulation Script -->
+  <script>
+    // Box Size Configurations (1m = 3.0 scene units for clear 3D visual scale)
+    const SCALE_1M = 3.0;
+    const BOX_CONFIGS = {
+      '1x1': {
+        id: '1x1',
+        label: '1m × 1m',
+        heLabel: '1m × 1m',
+        subLabel: 'Full Pallet Container (1 per pallet layer)',
+        dimX: 1.0 * SCALE_1M,
+        dimZ: 1.0 * SCALE_1M,
+        dimY: 0.55 * SCALE_1M
+      },
+      '1x0.5': {
+        id: '1x0.5',
+        label: '1m × 0.5m',
+        heLabel: '1m × 0.5m',
+        subLabel: 'Half-Pallet Container (2 per pallet layer)',
+        dimX: 1.0 * SCALE_1M,
+        dimZ: 0.5 * SCALE_1M,
+        dimY: 0.5 * SCALE_1M
+      },
+      '0.5x0.5': {
+        id: '0.5x0.5',
+        label: '0.5m × 0.5m',
+        heLabel: '0.5m × 0.5m',
+        subLabel: 'Quarter-Pallet Container (4 per pallet layer)',
+        dimX: 0.5 * SCALE_1M,
+        dimZ: 0.5 * SCALE_1M,
+        dimY: 0.45 * SCALE_1M
+      }
+    };
+
+    // High-contrast, vivid color palette for distinct SKUs and mixed pallet shipments
+    const DISTINCT_SKU_COLORS = [
+      0x2563eb, // Royal Blue
+      0xf59e0b, // Amber Gold
+      0x10b981, // Emerald Green
+      0xec4899, // Rose Pink
+      0x8b5cf6, // Vivid Violet
+      0x06b6d4, // Bright Cyan
+      0xef4444, // Crimson Red
+      0x84cc16, // Lime Green
+      0xf97316, // Tangerine Orange
+      0x14b8a6, // Teal
+      0x6366f1, // Indigo
+      0xeab308, // Sun Yellow
+      0xd946ef, // Fuchsia
+      0x0ea5e9, // Sky Blue
+      0x22c55e, // Kelly Green
+      0xf43f5e, // Coral Rose
+      0xa855f7, // Purple
+      0x0284c7, // Deep Azure
+      0xd97706, // Ochre
+      0x059669, // Forest Mint
+      0x4f46e5, // Electric Indigo
+      0xdb2777, // Deep Magenta
+      0x65a30d, // Olive Lime
+      0xdc2626  // Scarlet
+    ];
+
+    // Generate a unique, visually distinct color for each storage stack (columnIndex)
+    function getUniqueStackColor(stackIdx, totalStacks, seed) {
+      if (stackIdx < DISTINCT_SKU_COLORS.length) {
+        // Permute with coprime stride so neighboring stacks have high contrast
+        const idx = (stackIdx * 7 + seed * 5) % DISTINCT_SKU_COLORS.length;
+        return DISTINCT_SKU_COLORS[idx];
+      }
+      // Golden-angle HSL distribution guarantees every stack has a unique hue when stacks > 24
+      const goldenAngle = 137.507764;
+      const hue = ((stackIdx * goldenAngle + seed * 37) % 360) / 360;
+      const sat = 0.78 - ((stackIdx % 3) * 0.08);
+      const light = 0.50 + (((stackIdx >> 1) % 3) - 1) * 0.07;
+      const color = new THREE.Color().setHSL(hue, sat, light);
+      return color.getHex();
+    }
+
+    // State
+    const state = {
+      boxType: '1x1',      // '1x1' | '1x0.5' | '0.5x0.5'
+      gridX: 6,            // Cube Columns (X)
+      gridY: 8,            // Cube Rows (Y)
+      stagingRatio: 35,    // Staging / open area ratio (%)
+      height: 6,           // Max Cube Storage Layers (Z)
+      botCount: 4,         // Horizontal snake bots
+      speed: 1.0,          // Movement speed
+      glow: true,
+      showGaps: true,
+      viewMode: 'iso',
+      randomSeed: 1
+    };
+
+    // DOM Elements
+    const btnSize1x1 = document.getElementById('btnSize1x1');
+    const btnSize1x05 = document.getElementById('btnSize1x05');
+    const btnSize05x05 = document.getElementById('btnSize05x05');
+    const valBoxSizeLabel = document.getElementById('valBoxSizeLabel');
+
+    const sliderGridX = document.getElementById('sliderGridX');
+    const sliderGridY = document.getElementById('sliderGridY');
+    const sliderStagingRatio = document.getElementById('sliderStagingRatio');
+    const sliderHeight = document.getElementById('sliderHeight');
+    const sliderBots = document.getElementById('sliderBots');
+    const sliderSpeed = document.getElementById('sliderSpeed');
+
+    const valGridX = document.getElementById('valGridX');
+    const valGridY = document.getElementById('valGridY');
+    const valStagingRatio = document.getElementById('valStagingRatio');
+    const valHeight = document.getElementById('valHeight');
+    const valBots = document.getElementById('valBots');
+    const valSpeed = document.getElementById('valSpeed');
+
+    const metricVolume = document.getElementById('metricVolume');
+    const metricCapacity = document.getElementById('metricCapacity');
+    const metricSkuSub = document.getElementById('metricSkuSub');
+    const metricBoxSize = document.getElementById('metricBoxSize');
+    const metricBoxSub = document.getElementById('metricBoxSub');
+    const metricThroughput = document.getElementById('metricThroughput');
+
+    const btnViewIso = document.getElementById('btnViewIso');
+    const btnViewTop = document.getElementById('btnViewTop');
+    const btnViewFront = document.getElementById('btnViewFront');
+    const chkGlow = document.getElementById('chkGlow');
+    const chkShowGaps = document.getElementById('chkShowGaps');
+    const btnReset = document.getElementById('btnReset');
+    const btnRandomizeStacks = document.getElementById('btnRandomizeStacks');
+
+    const btnOpenReference = document.getElementById('btnOpenReference');
+    const btnCloseReference = document.getElementById('btnCloseReference');
+    const modalReference = document.getElementById('modalReference');
+
+    const container = document.getElementById('canvasContainer');
+
+    // Three.js Core Variables
+    let scene, camera, renderer, controls;
+    let gridGroup, cubeStorageGroup, stagingGroup, snakesGroup, floorMesh;
+    let snakes = [];
+    let stackHeights = [];
+    let stackSkuColors = [];
+    let stagingPalletCoords = [];
+    let animationFrameId;
+
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x030712);
+      scene.fog = new THREE.FogExp2(0x030712, 0.008);
+
+      const width = container.clientWidth || 800;
+      const height = container.clientHeight || 540;
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 1200);
+      setCameraView('iso');
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.02;
+      controls.minDistance = 15;
+      controls.maxDistance = 220;
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.82);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xe0f2fe, 1.35);
+      dirLight.position.set(50, 95, 45);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      scene.add(dirLight);
+
+      const cyanPointLight = new THREE.PointLight(0x00f2fe, 1.8, 140);
+      cyanPointLight.position.set(0, 40, 0);
+      scene.add(cyanPointLight);
+
+      gridGroup = new THREE.Group();
+      cubeStorageGroup = new THREE.Group();
+      stagingGroup = new THREE.Group();
+      snakesGroup = new THREE.Group();
+
+      scene.add(gridGroup);
+      scene.add(cubeStorageGroup);
+      scene.add(stagingGroup);
+      scene.add(snakesGroup);
+
+      const floorGeo = new THREE.PlaneGeometry(260, 260);
+      const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x070b12,
+        roughness: 0.85,
+        metalness: 0.2
+      });
+      floorMesh = new THREE.Mesh(floorGeo, floorMat);
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.position.y = 0;
+      floorMesh.receiveShadow = true;
+      scene.add(floorMesh);
+
+      rebuildWarehouse();
+
+      window.addEventListener('resize', onWindowResize);
+      animate();
+    }
+
+    function onWindowResize() {
+      if (!container || !renderer || !camera) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    function setCameraView(mode) {
+      state.viewMode = mode;
+      btnViewIso.className = 'px-3 py-1 text-xs rounded-lg font-medium transition ' + (mode === 'iso' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:text-white');
+      btnViewTop.className = 'px-3 py-1 text-xs rounded-lg font-medium transition ' + (mode === 'top' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:text-white');
+      btnViewFront.className = 'px-3 py-1 text-xs rounded-lg font-medium transition ' + (mode === 'front' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:text-white');
+
+      const boxCfg = BOX_CONFIGS[state.boxType];
+      const totalH = state.height * boxCfg.dimY + 6;
+      if (mode === 'iso') {
+        camera.position.set(45, totalH + 28, 52);
+        if (controls) controls.target.set(5, totalH / 2, 0);
+      } else if (mode === 'top') {
+        camera.position.set(5, totalH + 80, 0.01);
+        if (controls) controls.target.set(5, totalH / 2, 0);
+      } else if (mode === 'front') {
+        camera.position.set(5, totalH / 2, 72);
+        if (controls) controls.target.set(5, totalH / 2, 0);
+      }
+      if (controls) controls.update();
+    }
+
+    function setBoxSize(typeKey) {
+      state.boxType = typeKey;
+      const activeCls = 'px-2 py-2 rounded-lg text-xs font-semibold transition border bg-cyan-600 text-white border-cyan-400 shadow-sm';
+      const inactiveCls = 'px-2 py-2 rounded-lg text-xs font-semibold transition border bg-slate-800 text-slate-300 border-slate-700 hover:text-white';
+
+      btnSize1x1.className = (typeKey === '1x1') ? activeCls : inactiveCls;
+      btnSize1x05.className = (typeKey === '1x0.5') ? activeCls : inactiveCls;
+      btnSize05x05.className = (typeKey === '0.5x0.5') ? activeCls : inactiveCls;
+
+      rebuildWarehouse();
+    }
+
+    function clearGroup(grp) {
+      while (grp.children.length > 0) {
+        const obj = grp.children[0];
+        grp.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      }
+    }
+
+    // Convert Grid Column & Row indices to World X, Z coordinates using current box dimensions
+    function gridToWorld(col, row, startX, cubeDepth, cellX, cellZ) {
+      return {
+        x: startX + (col * cellX) + (cellX / 2),
+        z: (row * cellZ) - (cubeDepth / 2) + (cellZ / 2)
+      };
+    }
+
+    function rebuildWarehouse() {
+      clearGroup(gridGroup);
+      clearGroup(cubeStorageGroup);
+      clearGroup(stagingGroup);
+      clearGroup(snakesGroup);
+      snakes = [];
+      stackHeights = [];
+      stackSkuColors = [];
+      stagingPalletCoords = [];
+
+      const boxCfg = BOX_CONFIGS[state.boxType];
+      const cellX = boxCfg.dimX;
+      const cellZ = boxCfg.dimZ;
+      const cellY = boxCfg.dimY;
+
+      const xCols = state.gridX;
+      const yRows = state.gridY;
+      const maxLayers = state.height;
+
+      const stagingRatioFrac = state.stagingRatio / 100;
+      const stagingCols = Math.max(3, Math.round((xCols * stagingRatioFrac) / (1 - stagingRatioFrac)));
+      const totalCols = xCols + stagingCols;
+
+      const cubeWidth = xCols * cellX;
+      const stagingWidth = stagingCols * cellX;
+      const totalWidth = totalCols * cellX;
+      const cubeDepth = yRows * cellZ;
+      const cubeMaxHeight = maxLayers * cellY;
+      const ceilingY = cubeMaxHeight + 2.2;
+
+      const startX = - (totalWidth / 2);
+      const cubeStartX = startX;
+      const cubeEndX = cubeStartX + cubeWidth;
+      const stagingStartX = cubeEndX;
+
+      // 1. Build Dense Rubik's Cube Storage:
+      // Each vertical stack (i, j) represents ONE single product SKU -> uniform color for all boxes in that stack.
+      // Every stack has a different color from other stacks.
+      const boxGeom = new THREE.BoxGeometry(cellX * 0.96, cellY * 0.92, cellZ * 0.96);
+      const totalStacks = xCols * yRows;
+
+      let totalActualBoxes = 0;
+
+      for (let i = 0; i < xCols; i++) {
+        stackHeights[i] = [];
+        stackSkuColors[i] = [];
+        for (let j = 0; j < yRows; j++) {
+          const worldPos = gridToWorld(i, j, startX, cubeDepth, cellX, cellZ);
+
+          const randVal = Math.abs(Math.sin((i + 1) * 12.9898 + (j + 1) * 78.233 + state.randomSeed * 43.12));
+          let colHeight = 1 + Math.floor(randVal * maxLayers);
+          if ((i + j + state.randomSeed) % 4 === 0) {
+            colHeight = Math.max(1, Math.floor(maxLayers * 0.4));
+          } else if ((i * j + state.randomSeed) % 5 === 0) {
+            colHeight = maxLayers;
+          } else {
+            colHeight = Math.max(1, Math.min(maxLayers - 1, colHeight));
+          }
+
+          stackHeights[i][j] = colHeight;
+          totalActualBoxes += colHeight;
+
+          // Unique color for this stack (i, j); all boxes in this stack share this exact color
+          const stackLinearIdx = i * yRows + j;
+          const skuColorHex = getUniqueStackColor(stackLinearIdx, totalStacks, state.randomSeed);
+          stackSkuColors[i][j] = skuColorHex;
+
+          const stackMat = new THREE.MeshStandardMaterial({
+            color: skuColorHex,
+            roughness: 0.42,
+            metalness: 0.14
+          });
+
+          for (let k = 0; k < colHeight; k++) {
+            const yPos = (k * cellY) + (cellY / 2);
+            const boxMesh = new THREE.Mesh(boxGeom, stackMat);
+            boxMesh.position.set(worldPos.x, yPos, worldPos.z);
+            boxMesh.castShadow = true;
+            boxMesh.receiveShadow = true;
+            cubeStorageGroup.add(boxMesh);
+          }
+        }
+      }
+
+      // Outer structural corner pillars
+      const beamMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
+      const corners = [
+        [startX, -cubeDepth / 2],
+        [cubeEndX, -cubeDepth / 2],
+        [startX, cubeDepth / 2],
+        [cubeEndX, cubeDepth / 2],
+        [startX + totalWidth, -cubeDepth / 2],
+        [startX + totalWidth, cubeDepth / 2]
+      ];
+      corners.forEach(([cx, cz]) => {
+        const beamGeo = new THREE.BoxGeometry(0.28, ceilingY, 0.28);
+        const beam = new THREE.Mesh(beamGeo, beamMat);
+        beam.position.set(cx, ceilingY / 2, cz);
+        cubeStorageGroup.add(beam);
+      });
+
+      // 2. Build the Overhead Active Grid Rails aligned with the cell centers
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+      const glowMat = new THREE.MeshBasicMaterial({ color: state.glow ? 0x00f2fe : 0x0284c7 });
+
+      // X-direction Rails (along each Row j)
+      for (let j = 0; j < yRows; j++) {
+        const zPos = (j * cellZ) - (cubeDepth / 2) + (cellZ / 2);
+        const railGeo = new THREE.BoxGeometry(totalWidth, 0.2, 0.14);
+        const rail = new THREE.Mesh(railGeo, railMat);
+        rail.position.set(startX + (totalWidth / 2), ceilingY, zPos);
+        gridGroup.add(rail);
+
+        if (state.glow) {
+          const pGeo = new THREE.BoxGeometry(totalWidth, 0.05, 0.05);
+          const pLine = new THREE.Mesh(pGeo, glowMat);
+          pLine.position.set(startX + (totalWidth / 2), ceilingY + 0.13, zPos);
+          gridGroup.add(pLine);
+        }
+      }
+
+      // Z-direction Rails (along each Column i across both Cube and Staging zones)
+      for (let i = 0; i < totalCols; i++) {
+        const xPos = startX + (i * cellX) + (cellX / 2);
+        const railGeo = new THREE.BoxGeometry(0.14, 0.2, cubeDepth);
+        const rail = new THREE.Mesh(railGeo, railMat);
+        rail.position.set(xPos, ceilingY, 0);
+        gridGroup.add(rail);
+
+        if (state.glow) {
+          const pGeo = new THREE.BoxGeometry(0.05, 0.05, cubeDepth);
+          const pLine = new THREE.Mesh(pGeo, glowMat);
+          pLine.position.set(xPos, ceilingY + 0.13, 0);
+          gridGroup.add(pLine);
+        }
+      }
+
+      gridGroup.visible = state.showGaps;
+
+      // 3. Build Operational / Staging Area (Zone B) with Multi-SKU Shipment Pallets
+      const stagingFloorGeo = new THREE.PlaneGeometry(stagingWidth, cubeDepth);
+      const stagingFloorMat = new THREE.MeshBasicMaterial({
+        color: 0x059669,
+        transparent: true,
+        opacity: 0.08,
+        side: THREE.DoubleSide
+      });
+      const stagingFloor = new THREE.Mesh(stagingFloorGeo, stagingFloorMat);
+      stagingFloor.rotation.x = -Math.PI / 2;
+      stagingFloor.position.set(stagingStartX + (stagingWidth / 2), 0.02, 0);
+      stagingGroup.add(stagingFloor);
+
+      const divGeo = new THREE.BoxGeometry(0.2, 0.08, cubeDepth + 1.0);
+      const divMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+      const divider = new THREE.Mesh(divGeo, divMat);
+      divider.position.set(cubeEndX, 0.04, 0);
+      stagingGroup.add(divider);
+
+      const palletMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 });
+      const shipmentMaterials = DISTINCT_SKU_COLORS.map(
+        hex => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.42, metalness: 0.12 })
+      );
+
+      // Each loading pallet is always 1m x 1m (SCALE_1M x SCALE_1M)
+      const stepC = (state.boxType === '0.5x0.5') ? 3 : 2;
+      const stepR = (state.boxType === '1x1') ? 2 : 3;
+
+      let palletIdxCounter = 0;
+
+      for (let c = xCols + 1; c < totalCols; c += stepC) {
+        for (let r = 0; r < yRows; r += stepR) {
+          const wPos = gridToWorld(c, r, startX, cubeDepth, cellX, cellZ);
+
+          // Standard 1m x 1m Loading Pallet Base
+          const palSize = SCALE_1M * 0.96;
+          const palGeo = new THREE.BoxGeometry(palSize, 0.24, palSize);
+          const pal = new THREE.Mesh(palGeo, palletMat);
+          pal.position.set(wPos.x, 0.12, wPos.z);
+          pal.castShadow = true;
+          pal.receiveShadow = true;
+          stagingGroup.add(pal);
+
+          // Determine sub-box layout per layer to fill the entire 1m x 1m pallet:
+          // - 1m x 1m: 1 box per layer
+          // - 1m x 0.5m: 2 boxes per layer
+          // - 0.5m x 0.5m: 4 boxes per layer (2x2)
+          let slotOffsets = [];
+          if (state.boxType === '1x1') {
+            slotOffsets = [{ dx: 0, dz: 0 }];
+          } else if (state.boxType === '1x0.5') {
+            const quarter = SCALE_1M * 0.24;
+            slotOffsets = [
+              { dx: 0, dz: -quarter },
+              { dx: 0, dz: quarter }
+            ];
+          } else {
+            const quarter = SCALE_1M * 0.24;
+            slotOffsets = [
+              { dx: -quarter, dz: -quarter },
+              { dx: quarter,  dz: -quarter },
+              { dx: -quarter, dz: quarter },
+              { dx: quarter,  dz: quarter }
+            ];
+          }
+
+          // Every pallet stack has 2 to 3 tiers so multi-SKU vertical & horizontal diversity is clear for all box sizes
+          const pStack = 2 + ((c + r) % 2);
+          const bGeo = new THREE.BoxGeometry(cellX * 0.9, cellY * 0.86, cellZ * 0.9);
+
+          // Every single box in a pallet's stack represents a different product in the shipment -> unique color per box on the pallet
+          let boxIndexOnPallet = 0;
+          const baseColorOffset = (palletIdxCounter * 5 + state.randomSeed * 3) % shipmentMaterials.length;
+          palletIdxCounter++;
+
+          for (let h = 0; h < pStack; h++) {
+            const layerY = 0.24 + (h * cellY * 0.88) + (cellY * 0.44);
+            slotOffsets.forEach((slot) => {
+              const matIdx = (baseColorOffset + boxIndexOnPallet) % shipmentMaterials.length;
+              boxIndexOnPallet++;
+              const bMesh = new THREE.Mesh(bGeo, shipmentMaterials[matIdx]);
+              bMesh.position.set(wPos.x + slot.dx, layerY, wPos.z + slot.dz);
+              bMesh.castShadow = true;
+              bMesh.receiveShadow = true;
+              stagingGroup.add(bMesh);
+            });
+          }
+
+          stagingPalletCoords.push({
+            col: c,
+            row: r
+          });
+        }
+      }
+
+      if (stagingPalletCoords.length === 0) {
+        stagingPalletCoords.push({ col: xCols, row: 0 });
+      }
+
+      // 4. Build Horizontal Modular Snake Robots (small cubes relative to cargo boxes)
+      const numSnakes = state.botCount;
+      const snakeColors = [0x00f2fe, 0x38bdf8, 0x06b6d4, 0x22d3ee];
+      const numSegments = 5;
+      const segSize = Math.min(cellX, cellZ) * 0.42;
+
+      for (let s = 0; s < numSnakes; s++) {
+        const snakeContainer = new THREE.Group();
+        snakesGroup.add(snakeContainer);
+
+        const segments = [];
+        const segGeo = new THREE.BoxGeometry(segSize, 0.42, segSize);
+
+        for (let segIdx = 0; segIdx < numSegments; segIdx++) {
+          const isHead = (segIdx === 0);
+          const segMat = new THREE.MeshStandardMaterial({
+            color: isHead ? 0xf59e0b : snakeColors[s % snakeColors.length],
+            metalness: 0.65,
+            roughness: 0.25
+          });
+          const segMesh = new THREE.Mesh(segGeo, segMat);
+          segMesh.castShadow = true;
+          snakeContainer.add(segMesh);
+          segments.push(segMesh);
+        }
+
+        const initCol = s % xCols;
+        const initRow = (s * 2) % yRows;
+        const initSkuColor = (stackSkuColors[initCol] && stackSkuColors[initCol][initRow])
+          ? stackSkuColors[initCol][initRow]
+          : DISTINCT_SKU_COLORS[s % DISTINCT_SKU_COLORS.length];
+
+        // Hoist Assembly (Gripper + Cargo Box matching picked stack's SKU color + 4 Hoist Cables)
+        const hoistGroup = new THREE.Group();
+        snakeContainer.add(hoistGroup);
+
+        const gripperGeo = new THREE.BoxGeometry(cellX * 0.9, 0.18, cellZ * 0.9);
+        const gripperMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7 });
+        const gripperMesh = new THREE.Mesh(gripperGeo, gripperMat);
+        hoistGroup.add(gripperMesh);
+
+        const cargoGeo = new THREE.BoxGeometry(cellX * 0.86, cellY * 0.85, cellZ * 0.86);
+        const cargoMat = new THREE.MeshStandardMaterial({ color: initSkuColor, roughness: 0.4 });
+        const cargoMesh = new THREE.Mesh(cargoGeo, cargoMat);
+        cargoMesh.position.y = - (cellY * 0.45);
+        cargoMesh.castShadow = true;
+        hoistGroup.add(cargoMesh);
+
+        // 4 Telescopic Hoist Cables
+        const cablesGroup = new THREE.Group();
+        snakeContainer.add(cablesGroup);
+        const cableMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8 });
+        const ox = cellX * 0.35;
+        const oz = cellZ * 0.35;
+        const cableOffsets = [
+          [-ox, -oz], [ox, -oz], [-ox, oz], [ox, oz]
+        ];
+        const cableMeshes = [];
+        cableOffsets.forEach(([cxOff, czOff]) => {
+          const cGeo = new THREE.BoxGeometry(0.04, 1.0, 0.04);
+          const cMesh = new THREE.Mesh(cGeo, cableMat);
+          cMesh.position.set(cxOff, 0, czOff);
+          cablesGroup.add(cMesh);
+          cableMeshes.push(cMesh);
+        });
+
+        const initWorld = gridToWorld(initCol, initRow, startX, cubeDepth, cellX, cellZ);
+
+        const trail = [];
+        for (let t = 0; t < 140; t++) {
+          trail.push({ x: initWorld.x, z: initWorld.z });
+        }
+
+        snakes.push({
+          segments: segments,
+          segSize: segSize,
+          hoistGroup: hoistGroup,
+          cargoMesh: cargoMesh,
+          cablesGroup: cablesGroup,
+          cableMeshes: cableMeshes,
+          col: initCol,
+          row: initRow,
+          x: initWorld.x,
+          z: initWorld.z,
+          pathQueue: [],
+          trail: trail,
+          state: 'PICKING_IN_CUBE',
+          hoistY: ceilingY - 0.5,
+          hoistTargetY: ceilingY - 0.5,
+          hoistDir: 'down',
+          ceilingY: ceilingY,
+          startX: startX,
+          cubeDepth: cubeDepth,
+          cellX: cellX,
+          cellZ: cellZ,
+          cellY: cellY,
+          xCols: xCols,
+          yRows: yRows
+        });
+      }
+
+      updateMetrics(xCols, yRows, maxLayers, totalActualBoxes);
+    }
+
+    function buildOrthogonalPath(startCol, startRow, destCol, destRow) {
+      const path = [];
+      let currC = startCol;
+      let currR = startRow;
+
+      while (currC !== destCol) {
+        currC += (destCol > currC ? 1 : -1);
+        path.push({ col: currC, row: currR });
+      }
+      while (currR !== destRow) {
+        currR += (destRow > currR ? 1 : -1);
+        path.push({ col: currC, row: currR });
+      }
+      return path;
+    }
+
+    function updateMetrics(xCols, yRows, maxLayers, totalActualBoxes) {
+      const boxCfg = BOX_CONFIGS[state.boxType];
+      metricCapacity.innerText = totalActualBoxes.toLocaleString();
+      if (metricSkuSub) {
+        metricSkuSub.innerText = (xCols * yRows) + ' distinct SKU stacks';
+      }
+
+      const densityScore = Math.min(94, (89 + (xCols * yRows / 80) * 3 + (maxLayers / 8) * 2)).toFixed(1);
+      metricVolume.innerText = densityScore + '%';
+
+      metricBoxSize.innerText = boxCfg.label;
+      metricBoxSub.innerText = boxCfg.subLabel;
+      valBoxSizeLabel.innerText = boxCfg.heLabel;
+
+      const throughput = Math.round(state.botCount * 130 * state.speed);
+      metricThroughput.innerText = throughput.toLocaleString();
+
+      valGridX.innerText = xCols + ' Cols';
+      valGridY.innerText = yRows + ' Rows';
+      valStagingRatio.innerText = state.stagingRatio + '% of Grid';
+      valHeight.innerText = maxLayers + ' Tiers';
+      valBots.innerText = state.botCount + (state.botCount === 1 ? ' Robot' : ' Robots');
+      valSpeed.innerText = state.speed.toFixed(1) + 'x';
+    }
+
+    // Animation Loop
+    function animate() {
+      animationFrameId = requestAnimationFrame(animate);
+
+      const moveStep = 0.14 * state.speed;
+      const hoistStep = 0.18 * state.speed;
+
+      snakes.forEach((snake) => {
+        const ceilingY = snake.ceilingY;
+        const topDockY = ceilingY - 0.45;
+
+        // 1. State Machine for Orthogonal Grid Movement & Vertical Hoisting
+        if (snake.state === 'MOVING_TO_STAGING' || snake.state === 'MOVING_TO_CUBE') {
+          if (snake.pathQueue.length > 0) {
+            const nextNode = snake.pathQueue[0];
+            const targetWorld = gridToWorld(
+              nextNode.col,
+              nextNode.row,
+              snake.startX,
+              snake.cubeDepth,
+              snake.cellX,
+              snake.cellZ
+            );
+
+            const dx = targetWorld.x - snake.x;
+            const dz = targetWorld.z - snake.z;
+            const dist = Math.hypot(dx, dz);
+
+            if (dist <= moveStep) {
+              snake.x = targetWorld.x;
+              snake.z = targetWorld.z;
+              snake.col = nextNode.col;
+              snake.row = nextNode.row;
+              snake.pathQueue.shift();
+            } else {
+              if (Math.abs(dx) > 0.001) {
+                snake.x += Math.sign(dx) * moveStep;
+              } else if (Math.abs(dz) > 0.001) {
+                snake.z += Math.sign(dz) * moveStep;
+              }
+            }
+
+            snake.trail.unshift({ x: snake.x, z: snake.z });
+            if (snake.trail.length > 160) snake.trail.pop();
+          } else {
+            if (snake.state === 'MOVING_TO_STAGING') {
+              snake.state = 'LOWERING_AT_STAGING';
+              snake.hoistDir = 'down';
+              snake.hoistTargetY = 1.35; // Lower down onto the picking pallet
+            } else {
+              snake.state = 'PICKING_IN_CUBE';
+              snake.hoistDir = 'down';
+              const stackH = (stackHeights[snake.col] && stackHeights[snake.col][snake.row]) ? stackHeights[snake.col][snake.row] : 2;
+              snake.hoistTargetY = (stackH * snake.cellY) + 0.5;
+            }
+          }
+        } else if (snake.state === 'LOWERING_AT_STAGING') {
+          if (snake.hoistDir === 'down') {
+            snake.hoistY -= hoistStep;
+            if (snake.hoistY <= snake.hoistTargetY) {
+              snake.hoistY = snake.hoistTargetY;
+              snake.hoistDir = 'up';
+              // Pick a random SKU color for the return/inbound box
+              const nextHex = DISTINCT_SKU_COLORS[Math.floor(Math.random() * DISTINCT_SKU_COLORS.length)];
+              snake.cargoMesh.material.color.setHex(nextHex);
+            }
+          } else {
+            snake.hoistY += hoistStep;
+            if (snake.hoistY >= topDockY) {
+              snake.hoistY = topDockY;
+              const destCol = Math.floor(Math.random() * snake.xCols);
+              const destRow = Math.floor(Math.random() * snake.yRows);
+              snake.pathQueue = buildOrthogonalPath(snake.col, snake.row, destCol, destRow);
+              snake.state = 'MOVING_TO_CUBE';
+            }
+          }
+        } else if (snake.state === 'PICKING_IN_CUBE') {
+          if (snake.hoistDir === 'down') {
+            snake.hoistY -= hoistStep;
+            if (snake.hoistY <= snake.hoistTargetY) {
+              snake.hoistY = snake.hoistTargetY;
+              snake.hoistDir = 'up';
+              // Match the exact SKU color of the storage stack being picked!
+              const pickedSkuHex = (stackSkuColors[snake.col] && stackSkuColors[snake.col][snake.row])
+                ? stackSkuColors[snake.col][snake.row]
+                : DISTINCT_SKU_COLORS[0];
+              snake.cargoMesh.material.color.setHex(pickedSkuHex);
+            }
+          } else {
+            snake.hoistY += hoistStep;
+            if (snake.hoistY >= topDockY) {
+              snake.hoistY = topDockY;
+              const targetPallet = stagingPalletCoords[Math.floor(Math.random() * stagingPalletCoords.length)];
+              snake.pathQueue = buildOrthogonalPath(snake.col, snake.row, targetPallet.col, targetPallet.row);
+              snake.state = 'MOVING_TO_STAGING';
+            }
+          }
+        }
+
+        // 2. Update Horizontal Snake Segments along the orthogonal trail
+        const segSpacingSteps = Math.max(3, Math.round((snake.segSize * 1.25) / moveStep));
+        snake.segments.forEach((seg, idx) => {
+          const trailIdx = Math.min(idx * segSpacingSteps, snake.trail.length - 1);
+          const pos = snake.trail[trailIdx];
+          seg.position.set(pos.x, ceilingY + 0.3, pos.z);
+        });
+
+        // 3. Update Hoist & Telescopic Cables under the middle segment
+        const midSegPos = snake.segments[1] ? snake.segments[1].position : { x: snake.x, z: snake.z };
+        snake.hoistGroup.position.set(midSegPos.x, snake.hoistY, midSegPos.z);
+
+        const cableLength = Math.max(0.1, (ceilingY + 0.18) - snake.hoistY);
+        snake.cablesGroup.position.set(midSegPos.x, snake.hoistY + (cableLength / 2), midSegPos.z);
+        snake.cableMeshes.forEach(cMesh => {
+          cMesh.scale.y = cableLength;
+        });
+      });
+
+      if (controls) controls.update();
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    // Box Size Buttons Event Listeners
+    btnSize1x1.addEventListener('click', () => setBoxSize('1x1'));
+    btnSize1x05.addEventListener('click', () => setBoxSize('1x0.5'));
+    btnSize05x05.addEventListener('click', () => setBoxSize('0.5x0.5'));
+
+    // Sliders Event Listeners
+    sliderGridX.addEventListener('input', (e) => {
+      state.gridX = parseInt(e.target.value, 10);
+      rebuildWarehouse();
+    });
+
+    sliderGridY.addEventListener('input', (e) => {
+      state.gridY = parseInt(e.target.value, 10);
+      rebuildWarehouse();
+    });
+
+    sliderStagingRatio.addEventListener('input', (e) => {
+      state.stagingRatio = parseInt(e.target.value, 10);
+      rebuildWarehouse();
+    });
+
+    sliderHeight.addEventListener('input', (e) => {
+      state.height = parseInt(e.target.value, 10);
+      rebuildWarehouse();
+    });
+
+    sliderBots.addEventListener('input', (e) => {
+      state.botCount = parseInt(e.target.value, 10);
+      rebuildWarehouse();
+    });
+
+    sliderSpeed.addEventListener('input', (e) => {
+      state.speed = parseFloat(e.target.value);
+      valSpeed.innerText = state.speed.toFixed(1) + 'x';
+      const throughput = Math.round(state.botCount * 130 * state.speed);
+      metricThroughput.innerText = throughput.toLocaleString();
+    });
+
+    // Randomize stack heights button
+    btnRandomizeStacks.addEventListener('click', () => {
+      state.randomSeed += 1;
+      rebuildWarehouse();
+    });
+
+    // View Toggles
+    btnViewIso.addEventListener('click', () => setCameraView('iso'));
+    btnViewTop.addEventListener('click', () => setCameraView('top'));
+    btnViewFront.addEventListener('click', () => setCameraView('front'));
+
+    chkGlow.addEventListener('change', (e) => {
+      state.glow = e.target.checked;
+      rebuildWarehouse();
+    });
+
+    chkShowGaps.addEventListener('change', (e) => {
+      state.showGaps = e.target.checked;
+      gridGroup.visible = state.showGaps;
+    });
+
+    // Reference Modal Controls
+    btnOpenReference.addEventListener('click', () => {
+      modalReference.classList.remove('hidden');
+    });
+
+    btnCloseReference.addEventListener('click', () => {
+      modalReference.classList.add('hidden');
+    });
+
+    modalReference.addEventListener('click', (e) => {
+      if (e.target === modalReference) {
+        modalReference.classList.add('hidden');
+      }
+    });
+
+    // Reset Button
+    btnReset.addEventListener('click', () => {
+      state.boxType = '1x1';
+      state.gridX = 6;
+      state.gridY = 8;
+      state.stagingRatio = 35;
+      state.height = 6;
+      state.botCount = 4;
+      state.speed = 1.0;
+      state.glow = true;
+      state.showGaps = true;
+
+      sliderGridX.value = 6;
+      sliderGridY.value = 8;
+      sliderStagingRatio.value = 35;
+      sliderHeight.value = 6;
+      sliderBots.value = 4;
+      sliderSpeed.value = 1.0;
+      chkGlow.checked = true;
+      chkShowGaps.checked = true;
+
+      setBoxSize('1x1');
+      setCameraView('iso');
+    });
+
+    // Init on load
+    window.addEventListener('DOMContentLoaded', () => {
+      initThree();
+    });
+  </script>
+</body>
+</html>
