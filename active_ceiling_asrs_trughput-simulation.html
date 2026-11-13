@@ -1,0 +1,2755 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סימולטור ASRS תקרה אקטיבית - שריון מסדרונות זמן-מרחב וניתוח טלמטריה</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Heebo for clean Hebrew typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Engineering Telemetry Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Heebo', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- Top Header Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
+        <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-cubes-stacked text-white text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-black tracking-tight text-white">ASRS Active Ceiling Swarm Lab</h1>
+                        <span class="text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">Space-Time A* Corridors</span>
+                        <span class="text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">כיול: 300 משימות/שעה לרובוט</span>
+                    </div>
+                    <p class="text-xs text-slate-400">בקרת צבר מנופים תלת-שכבתית מכוילת לזמן אמת (12.0 שנ׳ למשימת בסיס): "Waze" מקומי, שריון מסדרונות זמן-מרחב וניתוח תפוקה שעתית</p>
+                </div>
+            </div>
+
+            <!-- Live Mode & Corridor Toggles -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Routing Kinematics Switch -->
+                <div class="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center text-xs">
+                    <button id="btn-mode-minturn" class="px-3 py-1.5 rounded-lg font-bold bg-cyan-600 text-white shadow transition">
+                        <i class="fa-solid fa-route ml-1"></i> מינימום פניות (קווי L)
+                    </button>
+                    <button id="btn-mode-zigzag" class="px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition">
+                        <i class="fa-solid fa-shuffle ml-1"></i> ניווט זיגזג (אלכסון)
+                    </button>
+                </div>
+
+                <!-- Space-Time Corridor Toggle -->
+                <button id="btn-toggle-corridors" class="px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30 transition flex items-center shadow-lg shadow-amber-500/10">
+                    <i class="fa-solid fa-shield-halved ml-1.5 text-amber-400"></i>
+                    <span id="corridor-toggle-label">שריון מסדרונות זמן-מרחב: פעיל</span>
+                </button>
+
+                <!-- Status Pill -->
+                <div class="flex items-center space-x-2 space-x-reverse bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                    <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="system-status-text" class="font-bold text-slate-200">פעיל</span>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-slate-400">צעד: <strong id="step-counter" class="text-cyan-400 font-mono">0</strong></span>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-slate-400">זמן אמת: <strong id="real-time-counter" class="text-emerald-400 font-mono">0.0 שנ׳</strong></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-[1600px] w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+
+        <!-- Right Column: Control Panel & Telemetry Export (4 Cols) -->
+        <aside class="lg:col-span-4 space-y-4 flex flex-col">
+            <div class="bg-slate-900/75 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3.5">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <h2 class="text-sm font-bold text-white flex items-center">
+                        <i class="fa-solid fa-sliders ml-2 text-cyan-400"></i>
+                        פרמטרים קינמטיים וכיול זמן אמת
+                    </h2>
+                    <span class="text-[11px] text-emerald-400 font-mono font-bold">300 Tasks/Hr Base</span>
+                </div>
+
+                <!-- Dedicated Kinematic Calibration Box -->
+                <div class="bg-slate-950/90 border border-emerald-500/40 rounded-xl p-3 space-y-2 shadow-inner">
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                        <span class="text-xs font-bold text-emerald-300 flex items-center">
+                            <i class="fa-solid fa-stopwatch ml-1.5 text-emerald-400"></i>
+                            לוח כיול קינמטי (300 משימות/שעה לרובוט)
+                        </span>
+                        <span id="calib-dt-badge" class="text-[11px] font-mono font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                            dt = 1.00 שנ׳/צעד
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                        <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                            <div class="text-slate-400">יעד בסיס לרובוט בודד:</div>
+                            <div class="font-bold text-white mt-0.5">300 משימות/שעה <span class="text-emerald-400 font-mono">(12.0s)</span></div>
+                        </div>
+                        <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                            <div class="text-slate-400">צעדי בסיס למשימה ($S_{base}$):</div>
+                            <div id="calib-sbase" class="font-bold text-cyan-300 font-mono mt-0.5">11.82 צעדים</div>
+                        </div>
+                        <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                            <div class="text-slate-400">זמן בסיס לצעד ($\Delta t_{step}$):</div>
+                            <div id="calib-dt-detail" class="font-bold text-amber-300 font-mono mt-0.5">1.015 שניות/צעד</div>
+                        </div>
+                        <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                            <div class="text-slate-400">תפוקה תיאורטית ($N \times 300$):</div>
+                            <div id="calib-ideal-tput" class="font-bold text-emerald-400 font-mono mt-0.5">6,600 משימות/שעה</div>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 leading-tight">
+                        * מחושב דינמית: $S_{base} = D_{manhattan}(N) + 0.87 \cdot C_{turn}$, כאשר $\Delta t_{step} = 12.0 / S_{base}$ שניות.
+                    </p>
+                </div>
+
+                <!-- Sliders Group -->
+                <div class="space-y-3">
+                    <!-- Number of Cranes -->
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 font-medium"><i class="fa-solid fa-robot ml-1 text-emerald-400"></i> מספר מנופים פעילים:</span>
+                            <span id="val-agents" class="font-bold text-emerald-400">22 מנופים</span>
+                        </div>
+                        <input type="range" id="slider-agents" min="4" max="50" value="22" 
+                            class="w-full accent-emerald-400 bg-slate-800 rounded-lg appearance-none h-2 cursor-pointer">
+                    </div>
+
+                    <!-- Grid Dimensions -->
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 font-medium"><i class="fa-solid fa-border-all ml-1 text-indigo-400"></i> גודל רשת תקרה (Grid):</span>
+                            <span id="val-grid" class="font-bold text-indigo-400">14x14</span>
+                        </div>
+                        <input type="range" id="slider-grid" min="10" max="20" value="14" 
+                            class="w-full accent-indigo-400 bg-slate-800 rounded-lg appearance-none h-2 cursor-pointer">
+                    </div>
+
+                    <!-- Turn Delay Penalty Slider -->
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-cyan-900/40">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-cyan-300 font-medium"><i class="fa-solid fa-gauge-simple-low ml-1"></i> קנס זמן בלימה בפנייה ($C_{turn}$):</span>
+                            <span id="val-turn-penalty" class="font-bold text-cyan-400">2 צעדים</span>
+                        </div>
+                        <input type="range" id="slider-turn-penalty" min="1" max="6" value="2" 
+                            class="w-full accent-cyan-400 bg-slate-800 rounded-lg appearance-none h-2 cursor-pointer">
+                        <p class="text-[10px] text-slate-400 mt-0.5">צעדי סימולציה הדרושים לבלימת המסה, שינוי ציר 90° והאצה.</p>
+                    </div>
+
+                    <!-- Space-Time Corridor Horizon Slider -->
+                    <div class="bg-slate-950/60 p-2.5 rounded-xl border border-amber-500/40">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-amber-300 font-medium"><i class="fa-solid fa-road-lock ml-1"></i> אופק שריון מסדרון זמן-מרחב ($H$):</span>
+                            <span id="val-corridor-horizon" class="font-bold text-amber-400">10 צעדים</span>
+                        </div>
+                        <input type="range" id="slider-corridor-horizon" min="4" max="18" value="10" 
+                            class="w-full accent-amber-400 bg-slate-800 rounded-lg appearance-none h-2 cursor-pointer">
+                        <p class="text-[10px] text-slate-400 mt-0.5">מספר צעדי עתיד ($t+1 \dots t+H$) שהמרכז נועל בטבלת השריון עבור מנוף שהוסלם.</p>
+                    </div>
+
+                    <!-- Density Escalation Threshold & Speed in 2 cols -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-slate-300">סף צפיפות ($D_{high}$):</span>
+                                <span id="val-density" class="font-bold text-rose-400">65%</span>
+                            </div>
+                            <input type="range" id="slider-density" min="35" max="90" value="65" 
+                                class="w-full accent-rose-400 bg-slate-800 rounded-lg appearance-none h-1.5 cursor-pointer">
+                        </div>
+
+                        <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-slate-300">מהירות ריצה:</span>
+                                <span id="val-speed" class="font-bold text-cyan-400">רגילה (x2)</span>
+                            </div>
+                            <input type="range" id="slider-speed" min="1" max="5" value="2" 
+                                class="w-full accent-cyan-400 bg-slate-800 rounded-lg appearance-none h-1.5 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Control Buttons -->
+                <div class="pt-2 border-t border-slate-800 grid grid-cols-3 gap-2">
+                    <button id="btn-play" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl transition shadow-lg shadow-emerald-600/20 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-play ml-1.5"></i> הפעל
+                    </button>
+                    <button id="btn-pause" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-3 rounded-xl transition shadow-lg shadow-amber-600/20 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-pause ml-1.5"></i> השהה
+                    </button>
+                    <button id="btn-reset" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-3 rounded-xl transition shadow-lg shadow-rose-600/20 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-rotate-right ml-1.5"></i> אתחל
+                    </button>
+                </div>
+
+                <!-- Telemetry Export & Auto-Benchmark Control Box -->
+                <div class="pt-3 border-t border-slate-800 space-y-2.5">
+                    <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center justify-between">
+                        <span><i class="fa-solid fa-flask-vial ml-1.5"></i> מעבדת טלמטריה ו-Benchmark</span>
+                        <span id="telemetry-rows-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">0 שורות לוג</span>
+                    </h3>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-export-live-csv" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium py-2 px-2.5 rounded-xl transition flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-file-csv ml-1.5 text-emerald-400"></i> ייצוא לוג ריצה (CSV)
+                        </button>
+                        <button id="btn-export-bench-csv" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium py-2 px-2.5 rounded-xl transition flex items-center justify-center text-xs disabled:opacity-40" disabled>
+                            <i class="fa-solid fa-table ml-1.5 text-amber-400"></i> ייצוא Benchmark (CSV)
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950/90 border border-amber-500/30 rounded-xl p-3 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-amber-300">סריקת צפיפות אוטומטית (Sweep)</span>
+                            <select id="sel-benchmark-mode" class="bg-slate-900 border border-slate-700 text-[11px] text-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-amber-400">
+                                <option value="CORRIDOR_VS_NAIVE">השווה: עם שריון מסדרונות מול ללא שריון</option>
+                                <option value="MINTURN_VS_ZIGZAG">השווה: קווי L מול זיגזג (עם מסדרונות)</option>
+                                <option value="ALL_THREE">השוואה משולשת (מסדרון L / ללא מסדרון / זיגזג)</option>
+                            </select>
+                        </div>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                            מריץ סדרת ניסויים מואצת על פני כל רמות הצפיפות ובוחן כיצד שריון מסדרונות זמן-מרחב מונע הסלמות חוזרות ומגדיל את שיא תפוקת המחסן.
+                        </p>
+                        <button id="btn-run-benchmark" class="w-full bg-gradient-to-r from-amber-500 via-cyan-600 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-slate-950 font-black py-2 px-3 rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-bolt ml-1.5"></i> הרצת מבחן עומסים אוטומטי (Auto-Benchmark)
+                        </button>
+                        <!-- Progress Bar -->
+                        <div id="benchmark-progress-wrap" class="hidden space-y-1 pt-1">
+                            <div class="flex justify-between text-[10px] text-amber-300 font-mono">
+                                <span id="benchmark-progress-label">מריץ תרחיש...</span>
+                                <span id="benchmark-progress-pct">0%</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="benchmark-progress-bar" class="bg-gradient-to-r from-amber-400 to-cyan-500 h-full transition-all duration-150" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend / States Guide -->
+                <div class="pt-2 border-t border-slate-800">
+                    <h3 class="text-[11px] font-bold text-slate-400 mb-2">מקרא מצבי סוכנים ומסדרונות זמן-מרחב:</h3>
+                    <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                        <div class="flex items-center space-x-2 space-x-reverse bg-slate-950/60 p-1.5 rounded-lg border border-amber-500/40">
+                            <span class="w-3 h-3 rounded-full bg-amber-400 shadow shadow-amber-400/80 inline-block"></span>
+                            <span class="text-amber-300 font-bold">מסדרון משוריין (Corridor)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 space-x-reverse bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                            <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span>
+                            <span class="text-slate-300">שיוט ישיר (Cruise)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 space-x-reverse bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                            <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block"></span>
+                            <span class="text-slate-300">בלימה/פנייה 90° (`⟳`)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 space-x-reverse bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                            <span class="w-3 h-3 rounded-full bg-orange-400 inline-block"></span>
+                            <span class="text-slate-300">המתנה/פינוי ציר (Waze)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 space-x-reverse bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                            <span class="w-3 h-3 rounded-full bg-purple-400 inline-block"></span>
+                            <span class="text-slate-300">מעקף או פינוי מסדרון</span>
+                        </div>
+                        <div class="flex items-center space-x-2 space-x-reverse bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                            <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                            <span class="text-slate-300">הסלמה למרכז (Escalated)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Left/Center Column: Active Ceiling Grid Canvas & Live Telemetry KPIs (8 Cols) -->
+        <section class="lg:col-span-8 flex flex-col space-y-4">
+
+            <!-- Live KPI Cards (5 Cards Calibrated to Real Physical Time & Hourly Rates) -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <!-- Card 1: Total Warehouse Hourly Throughput vs Theoretical Ideal -->
+                <div class="bg-slate-900/70 border border-emerald-900/40 p-3 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span>תפוקת מערכת (לשעה)</span>
+                        <i class="fa-solid fa-industry text-emerald-400"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1.5 space-x-reverse mt-1">
+                        <h3 id="stat-hourly-throughput" class="text-2xl font-black text-emerald-400 font-mono">0</h3>
+                        <span class="text-[10px] text-slate-400">משימות/שעה</span>
+                    </div>
+                    <div class="mt-1 text-[10px] text-emerald-300/90 font-mono flex items-center justify-between">
+                        <span id="stat-ideal-comparison">פוטנציאל: 6,600/שעה</span>
+                        <span id="stat-efficiency-pct" class="bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded">100%</span>
+                    </div>
+                </div>
+
+                <!-- Card 2: Single Robot Effective Rate & Cycle Time in Seconds -->
+                <div class="bg-slate-900/70 border border-cyan-900/40 p-3 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span>קצב רובוט וזמן משימה</span>
+                        <i class="fa-solid fa-stopwatch-20 text-cyan-400"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1.5 space-x-reverse mt-1">
+                        <h3 id="stat-robot-rate" class="text-2xl font-black text-cyan-400 font-mono">300</h3>
+                        <span class="text-[10px] text-slate-400">משימות/שעה לרובוט</span>
+                    </div>
+                    <div class="mt-1 text-[10px] text-cyan-300/90 font-mono" id="stat-avg-cycle-sec">
+                        זמן משימה: 12.0 שנ׳ (בסיס: 12.0s)
+                    </div>
+                </div>
+
+                <!-- Card 3: Space-Time Corridor Reservation -->
+                <div class="bg-slate-900/80 border border-amber-500/50 p-3 rounded-2xl shadow-lg relative overflow-hidden">
+                    <div class="flex items-center justify-between text-xs text-amber-300 font-bold">
+                        <span>מסדרונות זמן-מרחב</span>
+                        <i class="fa-solid fa-shield-halved text-amber-400"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-2 space-x-reverse mt-1">
+                        <h3 id="stat-active-corridors" class="text-2xl font-black text-amber-400 font-mono">0</h3>
+                        <span id="stat-reserved-slots" class="text-[10px] text-amber-200/80">0 תאים נעולים</span>
+                    </div>
+                    <div class="mt-1 text-[10px] text-amber-300/90 font-mono" id="stat-prevented-repeats">
+                        0 צעדי מסדרון מוגנים
+                    </div>
+                </div>
+
+                <!-- Card 4: Local Waze P2P & Braking Time Loss in Seconds -->
+                <div class="bg-slate-900/70 border border-purple-900/40 p-3 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span>בורר "Waze" ובלימות</span>
+                        <i class="fa-solid fa-code-branch text-purple-400"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-2 space-x-reverse mt-1">
+                        <h3 id="stat-smart-waits" class="text-xl font-black text-amber-400 font-mono">0</h3>
+                        <span class="text-[10px] text-slate-400">המתנות</span>
+                        <span class="text-slate-600">|</span>
+                        <h3 id="stat-detours" class="text-xl font-black text-purple-400 font-mono">0</h3>
+                        <span class="text-[10px] text-slate-400">מעקפים</span>
+                    </div>
+                    <div id="stat-turn-loss-sec" class="mt-1 text-[10px] text-purple-300/80 font-mono">
+                        אובדן בלימה: 0.0 שנ׳ (0 פניות)
+                    </div>
+                </div>
+
+                <!-- Card 5: Central Escalations per Minute & Repeat Rate -->
+                <div class="bg-slate-900/70 border border-rose-900/40 p-3 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span>עומס מתכנן מרכזי</span>
+                        <i class="fa-solid fa-tower-broadcast text-rose-400"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1.5 space-x-reverse mt-1">
+                        <h3 id="stat-escalations-rate" class="text-xl font-black text-rose-400 font-mono">0.0</h3>
+                        <span class="text-[10px] text-slate-400">הסלמות/דקה</span>
+                        <span id="stat-escalations-total" class="text-[10px] text-slate-500 font-mono">(סה״כ 0)</span>
+                    </div>
+                    <div id="stat-repeat-escalations" class="mt-1 text-[10px] text-rose-300/90 font-mono">
+                        הסלמות חוזרות: 0 (0%)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Container + Live Inspector -->
+            <div class="bg-slate-900/75 border border-slate-800 rounded-2xl p-4 shadow-2xl flex-1 flex flex-col">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div class="flex items-center space-x-3 space-x-reverse">
+                        <h2 class="text-sm font-bold text-white flex items-center">
+                            <i class="fa-solid fa-table-cells ml-2 text-amber-400"></i>
+                            תצוגת רשת תקרה אקטיבית ומסדרונות זמן-מרחב (Space-Time Reservation Grid)
+                        </h2>
+                        <span id="selected-agent-pill" class="text-[11px] bg-slate-800 text-cyan-300 px-2.5 py-0.5 rounded-full border border-slate-700">
+                            לחץ על מנוף לבדיקת מסלול ושריון
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-4 space-x-reverse text-xs">
+                        <label class="flex items-center space-x-1.5 space-x-reverse cursor-pointer text-amber-300 font-medium">
+                            <input type="checkbox" id="chk-show-corridors" checked class="accent-amber-400 rounded">
+                            <span>הצג מסדרונות משוריינים (`t+k`)</span>
+                        </label>
+                        <label class="flex items-center space-x-1.5 space-x-reverse cursor-pointer text-slate-300">
+                            <input type="checkbox" id="chk-show-paths" checked class="accent-cyan-400 rounded">
+                            <span>הצג מסלולי L מתוכננים</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Responsive Canvas Wrapper -->
+                <div id="canvas-wrapper" class="relative w-full flex-1 min-h-[390px] bg-slate-950 rounded-xl border border-slate-800/90 overflow-hidden flex items-center justify-center">
+                    <canvas id="asrsCanvas" class="cursor-pointer"></canvas>
+                </div>
+
+                <!-- Real-Time Decision Log Console -->
+                <div class="mt-3 bg-slate-950/90 border border-slate-800/80 rounded-xl p-2.5">
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                        <span class="font-bold text-slate-300"><i class="fa-solid fa-terminal ml-1 text-amber-400"></i> יומן החלטות מתכנן מרכזי (Space-Time A*) ובורר "Waze" מקומי:</span>
+                        <span class="font-mono text-[10px]">Real-Time Telemetry Feed</span>
+                    </div>
+                    <div id="system-log" class="h-20 overflow-y-auto font-mono text-[11px] space-y-1 text-slate-300 pr-1"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Engineering Benchmark Analytics Section (Full 12 Cols) -->
+        <section id="benchmark-analytics-section" class="lg:col-span-12 bg-slate-900/75 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center">
+                        <i class="fa-solid fa-chart-line ml-2 text-amber-400"></i>
+                        ניתוח גבולות המערכת: השפעת שריון מסדרונות זמן-מרחב וצפיפות הרובוטים על עומס המרכז ותפוקת המחסן
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        השוואה הנדסית ישירה: כיצד נעילת מסדרונות זמן-מרחב ($X, Y, T$) מונעת הסלמות שרשרת חוזרות באותו אזור ומאפשרת צפיפות עבודה גבוהה יותר.
+                    </p>
+                </div>
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <button id="btn-snapshot-to-chart" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-700/60 text-xs font-medium py-2 px-3 rounded-xl transition flex items-center">
+                        <i class="fa-solid fa-plus ml-1.5"></i> דגום ריצה חיה נוכחית לגרפים
+                    </button>
+                </div>
+            </div>
+
+            <!-- Automated Engineering Insights Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-950/70 border border-emerald-900/50 rounded-xl p-4 flex items-start space-x-3 space-x-reverse">
+                    <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-2.5 rounded-xl shrink-0">
+                        <i class="fa-solid fa-trophy text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-300">נקודת שיא תפוקה (Optimal Fleet Sweet Spot)</h4>
+                        <p id="insight-sweet-spot" class="text-sm font-bold text-emerald-400 mt-1">לחץ על "הרצת מבחן עומסים אוטומטי"</p>
+                        <p id="insight-sweet-spot-sub" class="text-[11px] text-slate-400 mt-0.5">מזהה את כמות המנופים הממקסמת את תפוקת המחסן לפני רוויה.</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/70 border border-amber-900/50 rounded-xl p-4 flex items-start space-x-3 space-x-reverse">
+                    <div class="bg-amber-500/10 border border-amber-500/30 text-amber-400 p-2.5 rounded-xl shrink-0">
+                        <i class="fa-solid fa-shield-halved text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-300">אפקט שריון מסדרונות זמן-מרחב (Corridor Gain)</h4>
+                        <p id="insight-corridor-gain" class="text-sm font-bold text-amber-400 mt-1">טרם הורץ מבחן השוואתי</p>
+                        <p id="insight-corridor-gain-sub" class="text-[11px] text-slate-400 mt-0.5">שיעור צמצום הסלמות חוזרות למרכז ושיפור התפוקה בצפיפות גבוהה.</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/70 border border-rose-900/50 rounded-xl p-4 flex items-start space-x-3 space-x-reverse">
+                    <div class="bg-rose-500/10 border border-rose-500/30 text-rose-400 p-2.5 rounded-xl shrink-0">
+                        <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-300">סף שבירת אוטונומיה (Autonomy Breakdown)</h4>
+                        <p id="insight-breakdown" class="text-sm font-bold text-rose-400 mt-1">טרם הורץ מבחן עומסים</p>
+                        <p id="insight-breakdown-sub" class="text-[11px] text-slate-400 mt-0.5">הצפיפות שבה שכבת ה-P2P המקומית מוצפת והקריאות למרכז מזנקות.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3 Interactive Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <!-- Chart 1: Central System Load (Escalations per Minute) -->
+                <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div class="mb-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-rose-950 text-rose-300 border border-rose-800/60 px-2 py-0.5 rounded">גרף 1: עומס מערכת מרכזית בדקה</span>
+                        <h3 class="text-sm font-bold text-slate-200 mt-1">קצב הסלמות למרכז לדקת פעילות (Escalations/Min)</h3>
+                        <p class="text-[11px] text-slate-400">כמות הפניות למתכנן המרכזי בכל דקת עבודה אמיתית כתלות בצפיפות הרובוטים</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[250px]">
+                        <canvas id="chartEscalations"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Average Cycle Time in Seconds (Baseline = 12.0s) -->
+                <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div class="mb-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-cyan-950 text-cyan-300 border border-cyan-800/60 px-2 py-0.5 rounded">גרף 2: זמן משימה בשניות (בסיס = 12.0 שנ׳)</span>
+                        <h3 class="text-sm font-bold text-slate-200 mt-1">זמן ממוצע להשלמת משימה (שניות)</h3>
+                        <p class="text-[11px] text-slate-400">מתחיל מ-12.0 שניות למשימה (300 משימות/שעה לרובוט) ועולה עקב עיכובים ופקקים</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[250px]">
+                        <canvas id="chartCycleTime"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 3: Total System Hourly Throughput vs Linear Ideal (N * 300) -->
+                <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div class="mb-2">
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded">גרף 3: תפוקת מחסן שעתית (משימות/שעה)</span>
+                        <h3 class="text-sm font-bold text-slate-200 mt-1">תפוקת מערכת כוללת בשעה מול פוטנציאל ($N \times 300$)</h3>
+                        <p class="text-[11px] text-slate-400">סך משימות בשעה של כל הצי לעומת קו התפוקה האידיאלי ללא הפרעות הדדיות</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[250px]">
+                        <canvas id="chartThroughput"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // ============================================================================
+        // DOM ELEMENTS & GLOBAL STATE
+        // ============================================================================
+        const canvas = document.getElementById('asrsCanvas');
+        const ctx = canvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+
+        // Controls
+        const sliderAgents = document.getElementById('slider-agents');
+        const sliderGrid = document.getElementById('slider-grid');
+        const sliderTurnPenalty = document.getElementById('slider-turn-penalty');
+        const sliderCorridorHorizon = document.getElementById('slider-corridor-horizon');
+        const sliderDensity = document.getElementById('slider-density');
+        const sliderSpeed = document.getElementById('slider-speed');
+
+        const valAgents = document.getElementById('val-agents');
+        const valGrid = document.getElementById('val-grid');
+        const valTurnPenalty = document.getElementById('val-turn-penalty');
+        const valCorridorHorizon = document.getElementById('val-corridor-horizon');
+        const valDensity = document.getElementById('val-density');
+        const valSpeed = document.getElementById('slider-speed-val') || document.getElementById('val-speed');
+
+        // Calibration Panel DOM
+        const calibDtBadge = document.getElementById('calib-dt-badge');
+        const calibSbase = document.getElementById('calib-sbase');
+        const calibDtDetail = document.getElementById('calib-dt-detail');
+        const calibIdealTput = document.getElementById('calib-ideal-tput');
+
+        const btnModeMinTurn = document.getElementById('btn-mode-minturn');
+        const btnModeZigzag = document.getElementById('btn-mode-zigzag');
+        const btnToggleCorridors = document.getElementById('btn-toggle-corridors');
+        const corridorToggleLabel = document.getElementById('corridor-toggle-label');
+
+        const btnPlay = document.getElementById('btn-play');
+        const btnPause = document.getElementById('btn-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const chkShowPaths = document.getElementById('chk-show-paths');
+        const chkShowCorridors = document.getElementById('chk-show-corridors');
+        const selectedAgentPill = document.getElementById('selected-agent-pill');
+
+        // Stats DOM (Calibrated to Physical Time & Hourly Throughput)
+        const statHourlyThroughput = document.getElementById('stat-hourly-throughput');
+        const statIdealComparison = document.getElementById('stat-ideal-comparison');
+        const statEfficiencyPct = document.getElementById('stat-efficiency-pct');
+        const statRobotRate = document.getElementById('stat-robot-rate');
+        const statAvgCycleSec = document.getElementById('stat-avg-cycle-sec');
+        const statActiveCorridors = document.getElementById('stat-active-corridors');
+        const statReservedSlots = document.getElementById('stat-reserved-slots');
+        const statPreventedRepeats = document.getElementById('stat-prevented-repeats');
+        const statSmartWaits = document.getElementById('stat-smart-waits');
+        const statDetours = document.getElementById('stat-detours');
+        const statTurnLossSec = document.getElementById('stat-turn-loss-sec');
+        const statEscalationsRate = document.getElementById('stat-escalations-rate');
+        const statEscalationsTotal = document.getElementById('stat-escalations-total');
+        const statRepeatEscalations = document.getElementById('stat-repeat-escalations');
+        const stepCounter = document.getElementById('step-counter');
+        const realTimeCounter = document.getElementById('real-time-counter');
+        const systemLog = document.getElementById('system-log');
+        const systemStatusText = document.getElementById('system-status-text');
+        const statusDot = document.getElementById('status-dot');
+        const telemetryRowsBadge = document.getElementById('telemetry-rows-badge');
+
+        // Benchmark & Export DOM
+        const btnExportLiveCsv = document.getElementById('btn-export-live-csv');
+        const btnExportBenchCsv = document.getElementById('btn-export-bench-csv');
+        const btnRunBenchmark = document.getElementById('btn-run-benchmark');
+        const btnSnapshotToChart = document.getElementById('btn-snapshot-to-chart');
+        const selBenchmarkMode = document.getElementById('sel-benchmark-mode');
+        const benchProgressWrap = document.getElementById('benchmark-progress-wrap');
+        const benchProgressLabel = document.getElementById('benchmark-progress-label');
+        const benchProgressPct = document.getElementById('benchmark-progress-pct');
+        const benchProgressBar = document.getElementById('benchmark-progress-bar');
+
+        // Insights DOM
+        const insightSweetSpot = document.getElementById('insight-sweet-spot');
+        const insightSweetSpotSub = document.getElementById('insight-sweet-spot-sub');
+        const insightCorridorGain = document.getElementById('insight-corridor-gain');
+        const insightCorridorGainSub = document.getElementById('insight-corridor-gain-sub');
+        const insightBreakdown = document.getElementById('insight-breakdown');
+        const insightBreakdownSub = document.getElementById('insight-breakdown-sub');
+
+        // Physical Calibration Constants (300 Tasks/Hour per Robot => 12.0 Seconds per Baseline Task)
+        const TARGET_ROBOT_TASKS_PER_HOUR = 300;
+        const BASELINE_TASK_TIME_SEC = 3600.0 / TARGET_ROBOT_TASKS_PER_HOUR; // 12.0 seconds
+
+        // Simulation Parameters
+        let gridSize = parseInt(sliderGrid.value);
+        let numAgents = parseInt(sliderAgents.value);
+        let turnDelaySteps = parseInt(sliderTurnPenalty.value);
+        let corridorHorizon = parseInt(sliderCorridorHorizon.value);
+        let densityThreshold = parseInt(sliderDensity.value) / 100.0;
+        let simSpeed = parseInt(sliderSpeed.value);
+        let routingMode = 'MIN_TURN'; // 'MIN_TURN' or 'ZIGZAG'
+        let useSpaceTimeCorridors = true;
+        let selectedAgentId = null;
+
+        // Dynamically Calibrated Base Step Time (dt_step in seconds)
+        let calibratedBaseSteps = 12.0;
+        let dtStepSeconds = 1.0;
+
+        /**
+         * Computes the baseline expected steps per mission (S_base) on an N x N grid
+         * with minimum-turn L-paths, and derives dt_step (seconds/step) so an uncongested
+         * robot completes 300 tasks/hour (12.0 seconds/task).
+         */
+        function computeKinematicCalibration(gSize, tDelay) {
+            // Expected Manhattan distance between two random points (with distance >= 3 filter)
+            const rawManhattan = (2.0 * (gSize * gSize - 1.0)) / (3.0 * gSize);
+            const expectedDistanceSteps = rawManhattan * 1.04; // slight adjustment for min-distance >= 3 filter
+            // In L-shaped routing, probability of needing 1 turn is ((gSize - 1)/gSize)^2 ≈ 0.87
+            const expectedTurns = Math.pow((gSize - 1.0) / gSize, 2);
+            // Each 90-deg turn pauses movement for (tDelay - 1) additional braking ticks in our state machine
+            const effectiveTurnTicks = Math.max(0, tDelay - 1) * expectedTurns;
+            const sBase = expectedDistanceSteps + effectiveTurnTicks;
+            const dtSec = BASELINE_TASK_TIME_SEC / sBase;
+            return {
+                expectedDistanceSteps,
+                expectedTurns,
+                sBase,
+                dtSec
+            };
+        }
+
+        function updateCalibrationDisplay() {
+            const cal = computeKinematicCalibration(gridSize, turnDelaySteps);
+            calibratedBaseSteps = cal.sBase;
+            dtStepSeconds = cal.dtSec;
+
+            calibDtBadge.textContent = `dt = ${dtStepSeconds.toFixed(2)} שנ׳/צעד`;
+            calibSbase.textContent = `${calibratedBaseSteps.toFixed(2)} צעדים`;
+            calibDtDetail.textContent = `${dtStepSeconds.toFixed(3)} שניות/צעד`;
+            const idealHourly = numAgents * TARGET_ROBOT_TASKS_PER_HOUR;
+            calibIdealTput.textContent = `${idealHourly.toLocaleString()} משימות/שעה`;
+        }
+
+        let isRunning = true;
+        let stepCount = 0;
+        let agents = [];
+        let reservationTable = null;
+
+        let metrics = {
+            finishedMissions: 0,
+            totalCycleSteps: 0,
+            totalTurns: 0,
+            totalTurnBrakeSteps: 0,
+            smartWaits: 0,
+            detoursTaken: 0,
+            corridorYields: 0,
+            totalEscalations: 0,
+            repeatEscalations: 0,
+            corridorsCreated: 0,
+            preventedRepeatEscalations: 0
+        };
+
+        let liveStepTelemetry = [];
+        let benchmarkResults = [];
+
+        let chartEscalationsInst = null;
+        let chartCycleTimeInst = null;
+        let chartThroughputInst = null;
+
+        // ============================================================================
+        // SPACE-TIME RESERVATION TABLE (CENTRAL COORDINATOR 3D CORRIDOR MANAGER)
+        // ============================================================================
+        class SpaceTimeReservationTable {
+            constructor() {
+                // step -> Map("x,y" -> agentId)
+                this.vertexReservations = new Map();
+                // step -> Map("x1,y1->x2,y2" -> agentId)
+                this.edgeReservations = new Map();
+                // agentId -> Array of { step, x, y, axis }
+                this.agentCorridors = new Map();
+            }
+
+            clear() {
+                this.vertexReservations.clear();
+                this.edgeReservations.clear();
+                this.agentCorridors.clear();
+            }
+
+            pruneOldSteps(currentStep) {
+                for (let [st] of this.vertexReservations) {
+                    if (st < currentStep) this.vertexReservations.delete(st);
+                }
+                for (let [st] of this.edgeReservations) {
+                    if (st < currentStep) this.edgeReservations.delete(st);
+                }
+                for (let [agId, corr] of this.agentCorridors) {
+                    const filtered = corr.filter(c => c.step >= currentStep);
+                    if (filtered.length === 0) {
+                        this.agentCorridors.delete(agId);
+                    } else {
+                        this.agentCorridors.set(agId, filtered);
+                    }
+                }
+            }
+
+            clearAgentReservation(agentId) {
+                const corr = this.agentCorridors.get(agentId);
+                if (!corr) return;
+                for (let item of corr) {
+                    const vMap = this.vertexReservations.get(item.step);
+                    if (vMap && vMap.get(`${item.x},${item.y}`) === agentId) {
+                        vMap.delete(`${item.x},${item.y}`);
+                    }
+                }
+                for (let [, eMap] of this.edgeReservations) {
+                    for (let [k, id] of eMap) {
+                        if (id === agentId) eMap.delete(k);
+                    }
+                }
+                this.agentCorridors.delete(agentId);
+            }
+
+            reserveVertex(step, x, y, agentId) {
+                if (!this.vertexReservations.has(step)) {
+                    this.vertexReservations.set(step, new Map());
+                }
+                this.vertexReservations.get(step).set(`${x},${y}`, agentId);
+            }
+
+            reserveEdge(step, fromX, fromY, toX, toY, agentId) {
+                if (!this.edgeReservations.has(step)) {
+                    this.edgeReservations.set(step, new Map());
+                }
+                // Reserve both directions to prevent swap conflict
+                this.edgeReservations.get(step).set(`${fromX},${fromY}->${toX},${toY}`, agentId);
+                this.edgeReservations.get(step).set(`${toX},${toY}->${fromX},${fromY}`, agentId);
+            }
+
+            isReservedByOther(step, x, y, agentId) {
+                const vMap = this.vertexReservations.get(step);
+                if (!vMap) return false;
+                const owner = vMap.get(`${x},${y}`);
+                return owner !== undefined && owner !== agentId;
+            }
+
+            isEdgeConflict(step, fromX, fromY, toX, toY, agentId) {
+                const eMap = this.edgeReservations.get(step);
+                if (!eMap) return false;
+                const owner = eMap.get(`${fromX},${fromY}->${toX},${toY}`);
+                return owner !== undefined && owner !== agentId;
+            }
+
+            isCellReservedSoon(currentStep, x, y, lookahead, excludeAgentId) {
+                for (let st = currentStep; st <= currentStep + lookahead; st++) {
+                    if (this.isReservedByOther(st, x, y, excludeAgentId)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            countTotalReservedSlots(currentStep) {
+                let count = 0;
+                for (let [st, vMap] of this.vertexReservations) {
+                    if (st >= currentStep) count += vMap.size;
+                }
+                return count;
+            }
+
+            /**
+             * Space-Time A* (3D Search in X, Y, Step) with Turn Braking Kinematics
+             * Computes a conflict-free corridor for the next `horizon` steps.
+             */
+            planSpaceTimeCorridor(agent, currentStep, horizon, gSize, tDelay, mode, staticObstaclesMap) {
+                this.clearAgentReservation(agent.id);
+
+                const turnWeight = (mode === 'MIN_TURN') ? (tDelay * 3.5 + 2) : 0;
+                const openList = [];
+                const visited = new Map();
+
+                const startNode = {
+                    x: agent.x,
+                    y: agent.y,
+                    step: currentStep,
+                    axis: agent.currentAxis,
+                    turnWait: agent.turnTimer,
+                    g: 0,
+                    h: Math.abs(agent.targetX - agent.x) + Math.abs(agent.targetY - agent.y),
+                    f: 0,
+                    parent: null
+                };
+                startNode.f = startNode.g + startNode.h;
+                openList.push(startNode);
+
+                const dirs = [
+                    { dx: 1, dy: 0, axis: 'X' },
+                    { dx: -1, dy: 0, axis: 'X' },
+                    { dx: 0, dy: 1, axis: 'Y' },
+                    { dx: 0, dy: -1, axis: 'Y' }
+                ];
+
+                let bestNode = null;
+                let iterations = 0;
+                const maxStep = currentStep + horizon;
+
+                while (openList.length > 0 && iterations < 1200) {
+                    iterations++;
+                    openList.sort((a, b) => a.f - b.f);
+                    const curr = openList.shift();
+
+                    if ((curr.x === agent.targetX && curr.y === agent.targetY) || curr.step >= maxStep) {
+                        bestNode = curr;
+                        break;
+                    }
+
+                    const stateKey = `${curr.x},${curr.y},${curr.step},${curr.axis},${curr.turnWait}`;
+                    if (visited.has(stateKey) && visited.get(stateKey) <= curr.g) continue;
+                    visited.set(stateKey, curr.g);
+
+                    const nextStep = curr.step + 1;
+
+                    // If agent is currently decelerating in a turn, it MUST stay in place for 1 tick
+                    if (curr.turnWait > 0) {
+                        if (!this.isReservedByOther(nextStep, curr.x, curr.y, agent.id)) {
+                            const ng = curr.g + 1.0;
+                            const nh = Math.abs(agent.targetX - curr.x) + Math.abs(agent.targetY - curr.y);
+                            openList.push({
+                                x: curr.x,
+                                y: curr.y,
+                                step: nextStep,
+                                axis: curr.axis,
+                                turnWait: curr.turnWait - 1,
+                                g: ng,
+                                h: nh,
+                                f: ng + nh,
+                                parent: curr
+                            });
+                        }
+                        continue;
+                    }
+
+                    // Action 1: Move or initiate 90-degree turn toward neighbor
+                    for (let d of dirs) {
+                        const nx = curr.x + d.dx;
+                        const ny = curr.y + d.dy;
+                        if (nx < 0 || nx >= gSize || ny < 0 || ny >= gSize) continue;
+
+                        const isTurn = (curr.axis !== null && curr.axis !== d.axis);
+
+                        if (isTurn && tDelay > 1) {
+                            // Initiating a turn means spending (tDelay - 1) ticks rotating in place at (curr.x, curr.y)
+                            if (!this.isReservedByOther(nextStep, curr.x, curr.y, agent.id)) {
+                                const stepCost = 1 + turnWeight;
+                                const ng = curr.g + stepCost;
+                                const nh = Math.abs(agent.targetX - curr.x) + Math.abs(agent.targetY - curr.y);
+                                openList.push({
+                                    x: curr.x,
+                                    y: curr.y,
+                                    step: nextStep,
+                                    axis: d.axis,
+                                    turnWait: tDelay - 2,
+                                    g: ng,
+                                    h: nh,
+                                    f: ng + nh,
+                                    parent: curr
+                                });
+                            }
+                        } else {
+                            // Direct move into (nx, ny) at nextStep
+                            if (this.isReservedByOther(nextStep, nx, ny, agent.id)) continue;
+                            if (this.isEdgeConflict(nextStep, curr.x, curr.y, nx, ny, agent.id)) continue;
+
+                            // Avoid immediate t+1 collision with another corridor-locked agent
+                            const immediateOccupant = (nextStep === currentStep + 1) ? staticObstaclesMap.get(`${nx},${ny}`) : null;
+                            if (immediateOccupant && immediateOccupant.id !== agent.id && immediateOccupant.corridorQueue && immediateOccupant.corridorQueue.length > 0) {
+                                continue;
+                            }
+
+                            let stepCost = 1.0;
+                            if (immediateOccupant && immediateOccupant.id !== agent.id) {
+                                // Slight penalty if cell is currently occupied by a normal P2P agent (so we prefer empty cells if available, or force P2P to yield)
+                                stepCost += 1.8;
+                            }
+                            if (mode === 'ZIGZAG' && !isTurn && curr.axis !== null) {
+                                stepCost += 0.65;
+                            }
+
+                            const ng = curr.g + stepCost;
+                            const nh = Math.abs(agent.targetX - nx) + Math.abs(agent.targetY - ny);
+                            openList.push({
+                                x: nx,
+                                y: ny,
+                                step: nextStep,
+                                axis: d.axis,
+                                turnWait: 0,
+                                g: ng,
+                                h: nh,
+                                f: ng + nh,
+                                parent: curr
+                            });
+                        }
+                    }
+
+                    // Action 2: Wait in place for 1 tick
+                    if (!this.isReservedByOther(nextStep, curr.x, curr.y, agent.id)) {
+                        const ng = curr.g + 1.4;
+                        const nh = Math.abs(agent.targetX - curr.x) + Math.abs(agent.targetY - curr.y);
+                        openList.push({
+                            x: curr.x,
+                            y: curr.y,
+                            step: nextStep,
+                            axis: curr.axis,
+                            turnWait: 0,
+                            g: ng,
+                            h: nh,
+                            f: ng + nh,
+                            parent: curr
+                        });
+                    }
+                }
+
+                if (!bestNode) return [];
+
+                // Reconstruct Space-Time Corridor Timeline
+                const timeline = [];
+                let ptr = bestNode;
+                while (ptr.parent !== null) {
+                    timeline.unshift({
+                        step: ptr.step,
+                        x: ptr.x,
+                        y: ptr.y,
+                        axis: ptr.axis,
+                        turnWait: ptr.turnWait,
+                        fromX: ptr.parent.x,
+                        fromY: ptr.parent.y
+                    });
+                    ptr = ptr.parent;
+                }
+
+                // Register reservations in global table
+                this.reserveVertex(currentStep, agent.x, agent.y, agent.id);
+                for (let slot of timeline) {
+                    this.reserveVertex(slot.step, slot.x, slot.y, agent.id);
+                    if (slot.x !== slot.fromX || slot.y !== slot.fromY) {
+                        this.reserveEdge(slot.step, slot.fromX, slot.fromY, slot.x, slot.y, agent.id);
+                    }
+                }
+                this.agentCorridors.set(agent.id, timeline);
+                return timeline;
+            }
+        }
+
+        // ============================================================================
+        // STANDARD 2D KINEMATIC PATH PLANNER (FOR LOCAL P2P & BASELINE)
+        // ============================================================================
+        function planPath(startX, startY, startDir, targetX, targetY, blockedSet, forceMode = null, customGridSize = null, customTurnDelay = null, highCostSet = null) {
+            const mode = forceMode || routingMode;
+            const gSize = customGridSize || gridSize;
+            const tDelay = (customTurnDelay !== null) ? customTurnDelay : turnDelaySteps;
+            const turnCostWeight = (mode === 'MIN_TURN') ? (tDelay * 4 + 2) : 0;
+
+            const openList = [];
+            const visited = new Map();
+
+            const startNode = {
+                x: startX,
+                y: startY,
+                dir: startDir,
+                g: 0,
+                h: Math.abs(targetX - startX) + Math.abs(targetY - startY),
+                f: 0,
+                parent: null
+            };
+            startNode.f = startNode.g + startNode.h;
+            openList.push(startNode);
+
+            const dirs = [
+                { dx: 1, dy: 0, axis: 'X' },
+                { dx: -1, dy: 0, axis: 'X' },
+                { dx: 0, dy: 1, axis: 'Y' },
+                { dx: 0, dy: -1, axis: 'Y' }
+            ];
+
+            let bestNode = null;
+            let iterations = 0;
+
+            while (openList.length > 0 && iterations < 900) {
+                iterations++;
+                openList.sort((a, b) => a.f - b.f);
+                const current = openList.shift();
+
+                if (current.x === targetX && current.y === targetY) {
+                    bestNode = current;
+                    break;
+                }
+
+                const stateKey = `${current.x},${current.y},${current.dir}`;
+                if (visited.has(stateKey) && visited.get(stateKey) <= current.g) continue;
+                visited.set(stateKey, current.g);
+
+                for (let d of dirs) {
+                    const nx = current.x + d.dx;
+                    const ny = current.y + d.dy;
+
+                    if (nx < 0 || nx >= gSize || ny < 0 || ny >= gSize) continue;
+                    const cellKey = `${nx},${ny}`;
+                    if (blockedSet && blockedSet.has(cellKey) && !(nx === targetX && ny === targetY)) {
+                        continue;
+                    }
+
+                    const isTurn = (current.dir !== null && current.dir !== d.axis);
+                    let stepCost = 1;
+
+                    if (mode === 'MIN_TURN') {
+                        if (isTurn) stepCost += turnCostWeight;
+                    } else {
+                        if (!isTurn && current.dir !== null) stepCost += 0.65;
+                    }
+
+                    // Penalize stepping into Space-Time Corridor cells reserved by Central Coordinator
+                    if (highCostSet && highCostSet.has(cellKey)) {
+                        stepCost += 8;
+                    }
+
+                    const ng = current.g + stepCost;
+                    const nh = Math.abs(targetX - nx) + Math.abs(targetY - ny);
+                    const nKey = `${nx},${ny},${d.axis}`;
+
+                    if (!visited.has(nKey) || visited.get(nKey) > ng) {
+                        openList.push({
+                            x: nx,
+                            y: ny,
+                            dir: d.axis,
+                            g: ng,
+                            h: nh,
+                            f: ng + nh,
+                            parent: current
+                        });
+                    }
+                }
+            }
+
+            if (!bestNode) return [];
+
+            const path = [];
+            let curr = bestNode;
+            while (curr.parent !== null) {
+                path.unshift({ x: curr.x, y: curr.y, axis: curr.dir });
+                curr = curr.parent;
+            }
+            return path;
+        }
+
+        function countTurnsInPath(initialAxis, pathArray) {
+            let turns = 0;
+            let axis = initialAxis;
+            for (let step of pathArray) {
+                if (axis !== null && step.axis !== axis) turns++;
+                axis = step.axis;
+            }
+            return turns;
+        }
+
+        // ============================================================================
+        // CRANE AGENT CLASS
+        // ============================================================================
+        class CraneAgent {
+            constructor(id, start, target) {
+                this.id = id;
+                this.x = start.x;
+                this.y = start.y;
+                this.targetX = target.x;
+                this.targetY = target.y;
+                this.currentAxis = null;
+                this.turnTimer = 0;
+                this.state = "CRUISE"; // CRUISE, TURNING, WAITING, DETOUR, ESCALATED, CORRIDOR
+                this.waitTime = 0;
+                this.missionSteps = 0;
+                this.missionEscalations = 0; // Tracks if this mission already escalated (to detect repeat escalations)
+                this.corridorQueue = []; // Locked Space-Time steps [{step, x, y, axis, turnWait}]
+                this.path = [];
+                this.lastDelta = { dx: 0, dy: 0 };
+                this.recalculatePath();
+            }
+
+            recalculatePath(blockedSet = null, highCostSet = null) {
+                this.path = planPath(this.x, this.y, this.currentAxis, this.targetX, this.targetY, blockedSet, null, null, null, highCostSet);
+            }
+
+            assignNewMission(occupiedMap) {
+                if (reservationTable) {
+                    reservationTable.clearAgentReservation(this.id);
+                }
+                let newTarget;
+                let attempts = 0;
+                do {
+                    newTarget = {
+                        x: Math.floor(Math.random() * gridSize),
+                        y: Math.floor(Math.random() * gridSize)
+                    };
+                    attempts++;
+                } while ((Math.abs(newTarget.x - this.x) + Math.abs(newTarget.y - this.y) < 4) && attempts < 50);
+
+                this.targetX = newTarget.x;
+                this.targetY = newTarget.y;
+                this.missionSteps = 0;
+                this.missionEscalations = 0;
+                this.waitTime = 0;
+                this.corridorQueue = [];
+                this.state = "CRUISE";
+                this.recalculatePath();
+            }
+
+            computeLocalDensity(allAgents, radius = 2) {
+                let activeNeighbors = 0;
+                const maxLocalCells = 12.0;
+                for (let other of allAgents) {
+                    if (other.id !== this.id) {
+                        const dist = Math.abs(this.x - other.x) + Math.abs(this.y - other.y);
+                        if (dist <= radius) activeNeighbors++;
+                    }
+                }
+                const baseDensity = activeNeighbors / maxLocalCells;
+                const waitMultiplier = 1.0 + (this.waitTime * 0.18);
+                return Math.min(1.0, baseDensity * waitMultiplier);
+            }
+        }
+
+        // ============================================================================
+        // LOGGING & INITIALIZATION
+        // ============================================================================
+        function logDecision(msg, type = 'info') {
+            const div = document.createElement('div');
+            let colorClass = 'text-slate-300';
+            if (type === 'corridor') colorClass = 'text-amber-300 font-medium';
+            else if (type === 'escalate') colorClass = 'text-rose-400';
+            else if (type === 'waze') colorClass = 'text-purple-300';
+
+            div.className = `${colorClass} leading-snug`;
+            div.innerHTML = `<span class="text-slate-500">[צעד ${stepCount}]</span> ${msg}`;
+            systemLog.prepend(div);
+            while (systemLog.children.length > 40) {
+                systemLog.removeChild(systemLog.lastChild);
+            }
+        }
+
+        function initSimulation() {
+            stepCount = 0;
+            stepCounter.textContent = "0";
+            realTimeCounter.textContent = "0.0 שנ׳";
+            systemLog.innerHTML = '';
+
+            updateCalibrationDisplay();
+            reservationTable = new SpaceTimeReservationTable();
+
+            metrics = {
+                finishedMissions: 0,
+                totalCycleSteps: 0,
+                totalTurns: 0,
+                totalTurnBrakeSteps: 0,
+                smartWaits: 0,
+                detoursTaken: 0,
+                corridorYields: 0,
+                totalEscalations: 0,
+                repeatEscalations: 0,
+                corridorsCreated: 0,
+                preventedRepeatEscalations: 0
+            };
+
+            liveStepTelemetry = [];
+            telemetryRowsBadge.textContent = `0 שורות לוג`;
+
+            agents = [];
+            let usedStarts = new Set();
+
+            for (let i = 0; i < numAgents; i++) {
+                let start, target;
+                let attempts = 0;
+                do {
+                    start = { x: Math.floor(Math.random() * gridSize), y: Math.floor(Math.random() * gridSize) };
+                    target = { x: Math.floor(Math.random() * gridSize), y: Math.floor(Math.random() * gridSize) };
+                    attempts++;
+                } while ((usedStarts.has(`${start.x},${start.y}`) || (Math.abs(start.x - target.x) + Math.abs(start.y - target.y) < 3)) && attempts < 100);
+
+                usedStarts.add(`${start.x},${start.y}`);
+                agents.push(new CraneAgent(i, start, target));
+            }
+
+            selectedAgentId = agents.length > 0 ? agents[0].id : null;
+            updateSelectedPill();
+            updateDashboard();
+            logDecision(`כיול מערכת הושלם: S_base=${calibratedBaseSteps.toFixed(1)} צעדים למשימה ⇐ dt=${dtStepSeconds.toFixed(2)} שנ׳/צעד (300 משימות/שעה לרובוט).`, 'corridor');
+            resizeCanvas();
+            draw();
+        }
+
+        // ============================================================================
+        // CORE SIMULATION STEP (3-TIER HYBRID + SPACE-TIME CORRIDOR RESERVATION)
+        // ============================================================================
+        function updateSimulationStep() {
+            stepCount++;
+            stepCounter.textContent = stepCount;
+            const elapsedRealSec = stepCount * dtStepSeconds;
+            realTimeCounter.textContent = elapsedRealSec >= 60
+                ? `${(elapsedRealSec / 60).toFixed(1)} דק׳ (${Math.round(elapsedRealSec)}s)`
+                : `${elapsedRealSec.toFixed(1)} שנ׳`;
+
+            reservationTable.pruneOldSteps(stepCount);
+
+            const prevEscalations = metrics.totalEscalations;
+            const prevRepeatEscalations = metrics.repeatEscalations;
+            const prevWaits = metrics.smartWaits;
+            const prevDetours = metrics.detoursTaken;
+            const prevTurns = metrics.totalTurns;
+
+            // Map current occupied cells
+            const posMap = new Map();
+            for (let a of agents) {
+                posMap.set(`${a.x},${a.y}`, a);
+            }
+
+            // Build set of cells reserved in the near future (stepCount .. stepCount+2) for local Waze awareness
+            const reservedSoonSet = new Set();
+            if (useSpaceTimeCorridors) {
+                for (let st = stepCount; st <= stepCount + 2; st++) {
+                    const vMap = reservationTable.vertexReservations.get(st);
+                    if (vMap) {
+                        for (let [cellKey] of vMap) reservedSoonSet.add(cellKey);
+                    }
+                }
+            }
+
+            const escalatedGroup = [];
+
+            // Sort agents so agents actively moving inside a locked Space-Time Corridor execute FIRST!
+            const orderedAgents = [...agents].sort((a, b) => {
+                const aCorr = (a.corridorQueue && a.corridorQueue.length > 0) ? 1 : 0;
+                const bCorr = (b.corridorQueue && b.corridorQueue.length > 0) ? 1 : 0;
+                return bCorr - aCorr;
+            });
+
+            for (let agent of orderedAgents) {
+                agent.missionSteps++;
+
+                // Check if reached target -> instant continuous warehouse mission assignment
+                if (agent.x === agent.targetX && agent.y === agent.targetY) {
+                    metrics.finishedMissions++;
+                    metrics.totalCycleSteps += agent.missionSteps;
+                    agent.assignNewMission(posMap);
+                    continue;
+                }
+
+                // ====================================================================
+                // TIER 2A: AGENT INSIDE A LOCKED SPACE-TIME CORRIDOR (PROTECTED TUNNEL)
+                // ====================================================================
+                if (useSpaceTimeCorridors && agent.corridorQueue && agent.corridorQueue.length > 0) {
+                    const slot = agent.corridorQueue[0];
+
+                    // Check if agent is staying in place due to turn braking or timed hold inside corridor
+                    if (slot.x === agent.x && slot.y === agent.y) {
+                        agent.corridorQueue.shift();
+                        if (agent.currentAxis !== null && slot.axis !== agent.currentAxis) {
+                            agent.currentAxis = slot.axis;
+                            metrics.totalTurns++;
+                        }
+                        if (slot.turnWait > 0) {
+                            metrics.totalTurnBrakeSteps++;
+                        }
+                        agent.state = "CORRIDOR";
+                        agent.waitTime = 0;
+                        if (agent.corridorQueue.length === 0) {
+                            agent.recalculatePath(null, reservedSoonSet);
+                        }
+                        continue;
+                    }
+
+                    // Moving to next reserved corridor cell (slot.x, slot.y)
+                    const nextKey = `${slot.x},${slot.y}`;
+                    const occupant = posMap.get(nextKey);
+
+                    if (!occupant || occupant.id === agent.id) {
+                        // Free to advance along locked corridor
+                        posMap.delete(`${agent.x},${agent.y}`);
+                        if (agent.currentAxis !== null && slot.axis !== agent.currentAxis) {
+                            metrics.totalTurns++;
+                        }
+                        agent.lastDelta = { dx: slot.x - agent.x, dy: slot.y - agent.y };
+                        agent.x = slot.x;
+                        agent.y = slot.y;
+                        agent.currentAxis = slot.axis;
+                        posMap.set(nextKey, agent);
+                        agent.corridorQueue.shift();
+                        agent.state = "CORRIDOR";
+                        agent.waitTime = 0;
+                        metrics.preventedRepeatEscalations++;
+
+                        if (agent.corridorQueue.length === 0) {
+                            agent.recalculatePath(null, reservedSoonSet);
+                        }
+                        continue;
+                    } else {
+                        // A regular P2P agent is still standing in our reserved slot!
+                        // Force the blocking agent to immediately yield/step aside into any adjacent free unreserved cell
+                        const dirs = [
+                            { dx: 1, dy: 0, axis: 'X' },
+                            { dx: -1, dy: 0, axis: 'X' },
+                            { dx: 0, dy: 1, axis: 'Y' },
+                            { dx: 0, dy: -1, axis: 'Y' }
+                        ];
+                        let yielded = false;
+                        for (let d of dirs) {
+                            const yx = occupant.x + d.dx;
+                            const yy = occupant.y + d.dy;
+                            const yKey = `${yx},${yy}`;
+                            if (yx >= 0 && yx < gridSize && yy >= 0 && yy < gridSize && !posMap.has(yKey) && !reservationTable.isReservedByOther(stepCount, yx, yy, occupant.id)) {
+                                // Blocker yields cell to corridor agent
+                                posMap.delete(nextKey);
+                                occupant.x = yx;
+                                occupant.y = yy;
+                                occupant.currentAxis = d.axis;
+                                occupant.turnTimer = 0;
+                                occupant.state = "DETOUR";
+                                occupant.recalculatePath(null, reservedSoonSet);
+                                posMap.set(yKey, occupant);
+                                metrics.corridorYields++;
+                                yielded = true;
+                                break;
+                            }
+                        }
+
+                        if (yielded) {
+                            // Now advance corridor agent smoothly
+                            posMap.delete(`${agent.x},${agent.y}`);
+                            agent.x = slot.x;
+                            agent.y = slot.y;
+                            agent.currentAxis = slot.axis;
+                            posMap.set(nextKey, agent);
+                            agent.corridorQueue.shift();
+                            agent.state = "CORRIDOR";
+                            agent.waitTime = 0;
+                            metrics.preventedRepeatEscalations++;
+                            if (agent.corridorQueue.length === 0) {
+                                agent.recalculatePath(null, reservedSoonSet);
+                            }
+                            continue;
+                        } else {
+                            // Extreme gridlock: re-plan corridor
+                            agent.corridorQueue = [];
+                            reservationTable.clearAgentReservation(agent.id);
+                        }
+                    }
+                }
+
+                // ====================================================================
+                // TIER 3: LOW-LEVEL KINEMATIC TURN DECELERATION (REGULAR P2P AGENT)
+                // ====================================================================
+                if (agent.turnTimer > 0) {
+                    agent.turnTimer--;
+                    agent.state = "TURNING";
+                    metrics.totalTurnBrakeSteps++;
+                    if (agent.turnTimer === 0 && agent.path.length > 0) {
+                        agent.state = "CRUISE";
+                    } else {
+                        continue;
+                    }
+                }
+
+                // Active Corridor Clearing: If a P2P agent is standing on a cell reserved for t+1 by a corridor, step off!
+                if (useSpaceTimeCorridors && reservationTable.isReservedByOther(stepCount + 1, agent.x, agent.y, agent.id)) {
+                    const dirs = [
+                        { dx: 1, dy: 0, axis: 'X' },
+                        { dx: -1, dy: 0, axis: 'X' },
+                        { dx: 0, dy: 1, axis: 'Y' },
+                        { dx: 0, dy: -1, axis: 'Y' }
+                    ];
+                    let cleared = false;
+                    for (let d of dirs) {
+                        const nx = agent.x + d.dx;
+                        const ny = agent.y + d.dy;
+                        const nKey = `${nx},${ny}`;
+                        if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize && !posMap.has(nKey) && !reservationTable.isReservedByOther(stepCount + 1, nx, ny, agent.id)) {
+                            posMap.delete(`${agent.x},${agent.y}`);
+                            agent.x = nx;
+                            agent.y = ny;
+                            agent.currentAxis = d.axis;
+                            posMap.set(nKey, agent);
+                            agent.state = "DETOUR";
+                            agent.recalculatePath(null, reservedSoonSet);
+                            metrics.corridorYields++;
+                            cleared = true;
+                            break;
+                        }
+                    }
+                    if (cleared) continue;
+                }
+
+                if (agent.path.length === 0) {
+                    agent.recalculatePath(null, reservedSoonSet);
+                    if (agent.path.length === 0) continue;
+                }
+
+                // Check Local Density Hysteresis Threshold
+                const localDensity = agent.computeLocalDensity(agents, 2);
+                if (localDensity > densityThreshold && agent.waitTime >= 2) {
+                    agent.state = "ESCALATED";
+                    escalatedGroup.push(agent);
+                    continue;
+                }
+
+                const nextStep = agent.path[0];
+                const nextKey = `${nextStep.x},${nextStep.y}`;
+
+                // Check if next cell is reserved by a Space-Time Corridor at this step or next step
+                const blockedByCorridor = useSpaceTimeCorridors && (
+                    reservationTable.isReservedByOther(stepCount, nextStep.x, nextStep.y, agent.id) ||
+                    reservationTable.isReservedByOther(stepCount + 1, nextStep.x, nextStep.y, agent.id)
+                );
+
+                // Check 90-degree turn braking before entering next cell
+                if (!blockedByCorridor && agent.currentAxis !== null && nextStep.axis !== agent.currentAxis) {
+                    agent.currentAxis = nextStep.axis;
+                    agent.turnTimer = turnDelaySteps - 1;
+                    metrics.totalTurns++;
+                    metrics.totalTurnBrakeSteps++;
+                    agent.state = "TURNING";
+                    continue;
+                }
+
+                // ====================================================================
+                // TIER 2B: LOCAL "WAZE" COOPERATIVE P2P NEGOTIATION
+                // ====================================================================
+                if (posMap.has(nextKey) || blockedByCorridor) {
+                    agent.waitTime++;
+
+                    if (blockedByCorridor && !posMap.has(nextKey)) {
+                        // Yielding to a protected Space-Time Corridor passing through
+                        agent.state = "WAITING";
+                        metrics.smartWaits++;
+                        metrics.corridorYields++;
+                        continue;
+                    }
+
+                    const blocker = posMap.get(nextKey);
+                    const blockerNext = blocker && blocker.path.length > 0 ? blocker.path[0] : null;
+                    const isHeadOnDeadlock = blockerNext && blockerNext.x === agent.x && blockerNext.y === agent.y;
+
+                    // If blocker is in a protected corridor, wait patiently rather than escalating!
+                    if (useSpaceTimeCorridors && blocker && blocker.corridorQueue && blocker.corridorQueue.length > 0 && agent.waitTime <= 5) {
+                        agent.state = "WAITING";
+                        metrics.smartWaits++;
+                        metrics.preventedRepeatEscalations++;
+                        continue;
+                    }
+
+                    if (isHeadOnDeadlock || agent.waitTime > 4) {
+                        agent.state = "ESCALATED";
+                        escalatedGroup.push(agent);
+                        continue;
+                    }
+
+                    const estimatedBlockerWait = (blocker && blocker.turnTimer > 0 ? blocker.turnTimer : 1) + 1;
+                    const tempBlocked = new Set([nextKey]);
+                    const detourPath = planPath(agent.x, agent.y, agent.currentAxis, agent.targetX, agent.targetY, tempBlocked, 'MIN_TURN', null, null, reservedSoonSet);
+
+                    if (detourPath.length > 0) {
+                        const currentRemainingTurns = countTurnsInPath(agent.currentAxis, agent.path);
+                        const detourTurns = countTurnsInPath(agent.currentAxis, detourPath);
+                        const currentTimeCost = agent.path.length + (currentRemainingTurns * turnDelaySteps) + estimatedBlockerWait;
+                        const detourTimeCost = detourPath.length + (detourTurns * turnDelaySteps);
+
+                        if (detourTimeCost < currentTimeCost && localDensity < densityThreshold * 0.85) {
+                            agent.path = detourPath;
+                            agent.state = "DETOUR";
+                            agent.waitTime = 0;
+                            metrics.detoursTaken++;
+                        } else {
+                            agent.state = "WAITING";
+                            metrics.smartWaits++;
+                        }
+                    } else {
+                        agent.state = "WAITING";
+                        metrics.smartWaits++;
+                    }
+                } else {
+                    // Clear cruise move
+                    posMap.delete(`${agent.x},${agent.y}`);
+                    agent.lastDelta = { dx: nextStep.x - agent.x, dy: nextStep.y - agent.y };
+                    agent.x = nextStep.x;
+                    agent.y = nextStep.y;
+                    agent.currentAxis = nextStep.axis;
+                    agent.path.shift();
+                    posMap.set(`${agent.x},${agent.y}`, agent);
+                    if (agent.state !== "DETOUR") agent.state = "CRUISE";
+                    agent.waitTime = 0;
+                }
+            }
+
+            // ====================================================================
+            // TIER 1: CENTRAL COORDINATOR (SPACE-TIME CORRIDOR RESERVATION vs NAIVE)
+            // ====================================================================
+            if (escalatedGroup.length > 0) {
+                for (let agent of escalatedGroup) {
+                    metrics.totalEscalations++;
+                    if (agent.missionEscalations > 0) {
+                        metrics.repeatEscalations++;
+                    }
+                    agent.missionEscalations++;
+
+                    if (useSpaceTimeCorridors) {
+                        // 3D Space-Time A* Corridor Reservation
+                        const corridorTimeline = reservationTable.planSpaceTimeCorridor(
+                            agent,
+                            stepCount,
+                            corridorHorizon,
+                            gridSize,
+                            turnDelaySteps,
+                            routingMode,
+                            posMap
+                        );
+
+                        if (corridorTimeline.length > 0) {
+                            agent.corridorQueue = corridorTimeline;
+                            agent.state = "CORRIDOR";
+                            agent.waitTime = 0;
+                            agent.turnTimer = 0;
+                            metrics.corridorsCreated++;
+                            logDecision(`מתכנן מרכזי (Space-Time A*): שריין מסדרון זמן-מרחב של ${corridorTimeline.length} צעדים עבור מנוף #${agent.id + 1}.`, 'corridor');
+            // Record Live Telemetry Row (Calibrated to Physical Seconds & Hourly Rates)
+            const activeCorridorAgents = agents.filter(a => a.corridorQueue && a.corridorQueue.length > 0).length;
+            const totalReservedSlots = useSpaceTimeCorridors ? reservationTable.countTotalReservedSlots(stepCount) : 0;
+            const gridDensityPct = ((numAgents / (gridSize * gridSize)) * 100).toFixed(1);
+
+            const avgCycleSteps = metrics.finishedMissions > 0
+                ? (metrics.totalCycleSteps / metrics.finishedMissions)
+                : calibratedBaseSteps;
+            const avgTaskSec = Number((avgCycleSteps * dtStepSeconds).toFixed(2));
+            const effectiveRobotTasksPerHr = avgTaskSec > 0 ? Number((3600.0 / avgTaskSec).toFixed(1)) : TARGET_ROBOT_TASKS_PER_HOUR;
+
+            // System Hourly Throughput (based on completed missions over elapsed real time, blended with active progress early on)
+            const systemTasksPerHour = elapsedRealSec > 0
+                ? Math.round((metrics.finishedMissions / elapsedRealSec) * 3600.0)
+                : 0;
+            const idealTasksPerHour = numAgents * TARGET_ROBOT_TASKS_PER_HOUR;
+            const escalationsPerMin = elapsedRealSec > 0
+                ? Number(((metrics.totalEscalations / elapsedRealSec) * 60.0).toFixed(2))
+                : 0;
+
+            liveStepTelemetry.push({
+                step: stepCount,
+                elapsedRealSec: Number(elapsedRealSec.toFixed(2)),
+                dtStepSec: Number(dtStepSeconds.toFixed(3)),
+                mode: routingMode,
+                corridorsEnabled: useSpaceTimeCorridors ? 'ACTIVE' : 'OFF',
+                corridorHorizon: corridorHorizon,
+                activeAgents: numAgents,
+                gridSize: `${gridSize}x${gridSize}`,
+                gridDensityPct: gridDensityPct,
+                turnPenaltyTicks: turnDelaySteps,
+                activeCorridorAgents: activeCorridorAgents,
+                reservedSpaceTimeSlots: totalReservedSlots,
+                stepEscalations: metrics.totalEscalations - prevEscalations,
+                cumulativeEscalations: metrics.totalEscalations,
+                escalationsPerMin: escalationsPerMin,
+                stepRepeatEscalations: metrics.repeatEscalations - prevRepeatEscalations,
+                cumulativeRepeatEscalations: metrics.repeatEscalations,
+                preventedRepeats: metrics.preventedRepeatEscalations,
+                corridorYields: metrics.corridorYields,
+                stepWaits: metrics.smartWaits - prevWaits,
+                stepDetours: metrics.detoursTaken - prevDetours,
+                stepTurns: metrics.totalTurns - prevTurns,
+                completedTasks: metrics.finishedMissions,
+                avgCycleSteps: Number(avgCycleSteps.toFixed(2)),
+                avgTaskTimeSec: avgTaskSec,
+                effectiveRobotTasksPerHr: effectiveRobotTasksPerHr,
+                systemTasksPerHour: systemTasksPerHour,
+                idealTasksPerHour: idealTasksPerHour
+            });
+
+            telemetryRowsBadge.textContent = `${liveStepTelemetry.length} שורות לוג`;
+            updateSelectedPill();
+            updateDashboard();
+        }
+
+        // ============================================================================
+        // DASHBOARD & CANVAS RENDERING (WITH PHYSICAL TIME & HOURLY RATES)
+        // ============================================================================
+        function updateDashboard() {
+            const elapsedSec = stepCount * dtStepSeconds;
+            const idealHourly = numAgents * TARGET_ROBOT_TASKS_PER_HOUR;
+
+            let avgCycleSteps = calibratedBaseSteps;
+            if (metrics.finishedMissions > 0) {
+                avgCycleSteps = metrics.totalCycleSteps / metrics.finishedMissions;
+            }
+            const avgTaskSec = avgCycleSteps * dtStepSeconds;
+            const effectiveRobotRate = avgTaskSec > 0 ? Math.min(320, Math.round(3600.0 / avgTaskSec)) : TARGET_ROBOT_TASKS_PER_HOUR;
+
+            const actualHourlyThroughput = elapsedSec > 0 && metrics.finishedMissions > 0
+                ? Math.round((metrics.finishedMissions / elapsedSec) * 3600.0)
+                : (stepCount === 0 ? 0 : Math.round(numAgents * effectiveRobotRate));
+
+            const efficiencyPct = idealHourly > 0 ? Math.min(100, Math.round((actualHourlyThroughput / idealHourly) * 100)) : 100;
+
+            statHourlyThroughput.textContent = actualHourlyThroughput.toLocaleString();
+            statIdealComparison.textContent = `פוטנציאל: ${idealHourly.toLocaleString()}/שעה`;
+            statEfficiencyPct.textContent = `${efficiencyPct}% יעילות`;
+
+            statRobotRate.textContent = metrics.finishedMissions > 0 ? effectiveRobotRate : TARGET_ROBOT_TASKS_PER_HOUR;
+            statAvgCycleSec.textContent = metrics.finishedMissions > 0
+                ? `זמן משימה: ${avgTaskSec.toFixed(1)} שנ׳ (${avgCycleSteps.toFixed(1)} צעדים)`
+                : `זמן בסיס מכויל: 12.0 שנ׳ (${calibratedBaseSteps.toFixed(1)} צעדים)`;
+
+            const activeCorrCount = agents.filter(a => a.corridorQueue && a.corridorQueue.length > 0).length;
+            const reservedSlots = (useSpaceTimeCorridors && reservationTable) ? reservationTable.countTotalReservedSlots(stepCount) : 0;
+            statActiveCorridors.textContent = activeCorrCount;
+            statReservedSlots.textContent = `${reservedSlots} תאים נעולים`;
+            statPreventedRepeats.textContent = `${metrics.preventedRepeatEscalations} צעדי מסדרון מוגנים`;
+
+            const brakeLossSec = (metrics.totalTurnBrakeSteps * dtStepSeconds).toFixed(1);
+            statSmartWaits.textContent = metrics.smartWaits;
+            statDetours.textContent = metrics.detoursTaken;
+            statTurnLossSec.textContent = `אובדן בלימה: ${brakeLossSec} שנ׳ (${metrics.totalTurns} פניות)`;
+
+            const escPerMin = elapsedSec > 0 ? ((metrics.totalEscalations / elapsedSec) * 60.0).toFixed(1) : "0.0";
+            statEscalationsRate.textContent = escPerMin;
+            statEscalationsTotal.textContent = `(סה״כ ${metrics.totalEscalations})`;
+
+            const repeatPct = metrics.totalEscalations > 0
+                ? Math.round((metrics.repeatEscalations / metrics.totalEscalations) * 100)
+                : 0;
+            statRepeatEscalations.textContent = `הסלמות חוזרות: ${metrics.repeatEscalations} (${repeatPct}%)`;
+        }
+
+        function updateSelectedPill() {
+            if (selectedAgentId === null) {
+                selectedAgentPill.textContent = "לחץ על מנוף לבדיקת מסלול ושריון";
+                return;
+            }
+            const ag = agents.find(a => a.id === selectedAgentId);
+            if (!ag) return;
+            const corrInfo = (ag.corridorQueue && ag.corridorQueue.length > 0)
+                ? `במסדרון משוריין (${ag.corridorQueue.length} צעדים נותרו)`
+                : `מצב: ${ag.state}`;
+            selectedAgentPill.textContent = `מנוף #${ag.id + 1} | מיקום (${ag.x},${ag.y}) ← יעד (${ag.targetX},${ag.targetY}) | ${corrInfo}`;
+        }
+
+        function resizeCanvas() {
+            const rect = canvasWrapper.getBoundingClientRect();
+            const size = Math.min(rect.width - 24, rect.height - 24, 620);
+            canvas.width = Math.max(300, size);
+            canvas.height = Math.max(300, size);
+            draw();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cellSize = canvas.width / gridSize;
+
+            // 1. Draw Active Ceiling Structural Grid
+            ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= gridSize; i++) {
+                const pos = i * cellSize;
+                ctx.beginPath();
+                ctx.moveTo(pos, 0);
+                ctx.lineTo(pos, canvas.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, pos);
+                ctx.lineTo(canvas.width, pos);
+                ctx.stroke();
+            }
+
+            // 2. Draw Space-Time Reserved Corridors (Glowing Golden/Cyan Tunnels + Time Markers)
+            if (useSpaceTimeCorridors && chkShowCorridors.checked && reservationTable) {
+                for (let agent of agents) {
+                    if (!agent.corridorQueue || agent.corridorQueue.length === 0) continue;
+
+                    const isSelected = (agent.id === selectedAgentId);
+                    ctx.save();
+
+                    // Draw corridor tube polyline
+                    ctx.beginPath();
+                    ctx.moveTo((agent.x + 0.5) * cellSize, (agent.y + 0.5) * cellSize);
+                    for (let slot of agent.corridorQueue) {
+                        ctx.lineTo((slot.x + 0.5) * cellSize, (slot.y + 0.5) * cellSize);
+                    }
+                    ctx.strokeStyle = isSelected ? 'rgba(251, 191, 36, 0.95)' : 'rgba(245, 158, 11, 0.65)';
+                    ctx.lineWidth = Math.max(6, cellSize * 0.28);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.stroke();
+
+                    // Draw individual reserved time-space slots with t+k labels
+                    for (let i = 0; i < agent.corridorQueue.length; i++) {
+                        const slot = agent.corridorQueue[i];
+                        const dt = slot.step - stepCount;
+                        if (dt < 0) continue;
+
+                        const rx = slot.x * cellSize;
+                        const ry = slot.y * cellSize;
+
+                        ctx.fillStyle = isSelected ? 'rgba(251, 191, 36, 0.22)' : 'rgba(245, 158, 11, 0.12)';
+                        ctx.fillRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
+
+                        ctx.strokeStyle = isSelected ? 'rgba(251, 191, 36, 0.8)' : 'rgba(245, 158, 11, 0.4)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(rx + 2, ry + 2, cellSize - 4, cellSize - 4);
+
+                        // Time offset badge (t+1, t+2...)
+                        if (cellSize >= 26 && i < 6) {
+                            ctx.fillStyle = '#fde68a';
+                            ctx.font = `bold ${Math.max(8, Math.floor(cellSize * 0.21))}px Heebo, monospace`;
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'top';
+                            ctx.fillText(`t+${dt}`, rx + 4, ry + 3);
+                        }
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            // 3. Draw Planned L-Paths for Agents
+            if (chkShowPaths.checked) {
+                for (let agent of agents) {
+                    const isSelected = (agent.id === selectedAgentId);
+                    if (agent.path.length === 0) continue;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo((agent.x + 0.5) * cellSize, (agent.y + 0.5) * cellSize);
+                    for (let pt of agent.path) {
+                        ctx.lineTo((pt.x + 0.5) * cellSize, (pt.y + 0.5) * cellSize);
+                    }
+                    ctx.strokeStyle = isSelected ? 'rgba(34, 211, 238, 0.9)' : 'rgba(148, 163, 184, 0.22)';
+                    ctx.lineWidth = isSelected ? 3 : 1.5;
+                    ctx.setLineDash(isSelected ? [] : [4, 4]);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // 4. Draw Target Markers
+            for (let agent of agents) {
+                const isSelected = (agent.id === selectedAgentId);
+                const tx = (agent.targetX + 0.5) * cellSize;
+                const ty = (agent.targetY + 0.5) * cellSize;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(tx, ty, cellSize * 0.22, 0, Math.PI * 2);
+                ctx.strokeStyle = isSelected ? '#22d3ee' : 'rgba(52, 211, 153, 0.55)';
+                ctx.lineWidth = isSelected ? 2.5 : 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = isSelected ? '#22d3ee' : 'rgba(52, 211, 153, 0.8)';
+                ctx.font = `bold ${Math.max(8, Math.floor(cellSize * 0.22))}px Heebo`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${agent.id + 1}`, tx, ty);
+                ctx.restore();
+            }
+
+            // 5. Draw Cranes (Agents)
+            for (let agent of agents) {
+                const cx = (agent.x + 0.5) * cellSize;
+                const cy = (agent.y + 0.5) * cellSize;
+                const radius = cellSize * 0.36;
+                const isSelected = (agent.id === selectedAgentId);
+                const inCorridor = agent.corridorQueue && agent.corridorQueue.length > 0;
+
+                let fillColor = '#10b981'; // CRUISE (Emerald)
+                let ringColor = '#059669';
+
+                if (inCorridor || agent.state === 'CORRIDOR') {
+                    fillColor = '#fbbf24'; // CORRIDOR (Gold/Amber)
+                    ringColor = '#fef08a';
+                } else if (agent.state === 'TURNING') {
+                    fillColor = '#22d3ee'; // TURNING 90 deg (Cyan)
+                    ringColor = '#0891b2';
+                } else if (agent.state === 'WAITING') {
+                    fillColor = '#fb923c'; // WAITING (Orange)
+                    ringColor = '#ea580c';
+                } else if (agent.state === 'DETOUR') {
+                    fillColor = '#c084fc'; // DETOUR / YIELD (Purple)
+                    ringColor = '#9333ea';
+                } else if (agent.state === 'ESCALATED') {
+                    fillColor = '#f43f5e'; // ESCALATED (Rose)
+                    ringColor = '#e11d48';
+                }
+
+                ctx.save();
+
+                // Outer glow for Corridor or Selected Agent
+                if (inCorridor || isSelected) {
+                    ctx.shadowColor = inCorridor ? '#fbbf24' : '#38bdf8';
+                    ctx.shadowBlur = isSelected ? 16 : 12;
+                }
+
+                // Crane Body Circle
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+
+                ctx.lineWidth = isSelected ? 3 : 2;
+                ctx.strokeStyle = isSelected ? '#ffffff' : ringColor;
+                ctx.stroke();
+
+                // Label inside Crane
+                ctx.fillStyle = '#020617';
+                ctx.font = `900 ${Math.max(9, Math.floor(cellSize * 0.27))}px Heebo`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const label = agent.state === 'TURNING' ? `⟳` : `${agent.id + 1}`;
+                ctx.fillText(label, cx, cy);
+
+                ctx.restore();
+            }
+        }
+
+        // Select crane on canvas click
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const cellSize = canvas.width / gridSize;
+            const gx = Math.floor(mx / cellSize);
+            const gy = Math.floor(my / cellSize);
+
+            const clicked = agents.find(a => a.x === gx && a.y === gy);
+            if (clicked) {
+                selectedAgentId = clicked.id;
+                updateSelectedPill();
+                draw();
+            }
+        });
+
+        // ============================================================================
+        // ANIMATION LOOP & UI CONTROLS
+        // ============================================================================
+        let lastFrameTime = 0;
+        function animationLoop(timestamp) {
+            const intervals = [0, 520, 280, 160, 90, 45];
+            const interval = intervals[simSpeed] || 280;
+
+            if (isRunning && timestamp - lastFrameTime >= interval) {
+                updateSimulationStep();
+                draw();
+                lastFrameTime = timestamp;
+            }
+            requestAnimationFrame(animationLoop);
+        }
+
+        btnPlay.addEventListener('click', () => {
+            isRunning = true;
+            systemStatusText.textContent = "פעיל";
+            statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+        });
+
+        btnPause.addEventListener('click', () => {
+            isRunning = false;
+            systemStatusText.textContent = "מושהה";
+            statusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+        });
+
+        btnReset.addEventListener('click', () => {
+            initSimulation();
+        });
+
+        btnModeMinTurn.addEventListener('click', () => {
+            routingMode = 'MIN_TURN';
+            btnModeMinTurn.className = "px-3 py-1.5 rounded-lg font-bold bg-cyan-600 text-white shadow transition";
+            btnModeZigzag.className = "px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition";
+            agents.forEach(a => a.recalculatePath());
+            logDecision("אלגוריתם ניתוב הוחלף ל: מינימום פניות (קווי L ישרים).", 'info');
+            draw();
+        });
+
+        btnModeZigzag.addEventListener('click', () => {
+            routingMode = 'ZIGZAG';
+            btnModeZigzag.className = "px-3 py-1.5 rounded-lg font-bold bg-amber-600 text-white shadow transition";
+            btnModeMinTurn.className = "px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition";
+            agents.forEach(a => a.recalculatePath());
+            logDecision("אלגוריתם ניתוב הוחלף ל: ניווט זיגזג (אשליית אלכסון מרובת פניות).", 'info');
+            draw();
+        });
+
+        btnToggleCorridors.addEventListener('click', () => {
+            useSpaceTimeCorridors = !useSpaceTimeCorridors;
+            if (useSpaceTimeCorridors) {
+                btnToggleCorridors.className = "px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30 transition flex items-center shadow-lg shadow-amber-500/10";
+                corridorToggleLabel.textContent = "שריון מסדרונות זמן-מרחב: פעיל";
+                logDecision("שריון מסדרונות זמן-מרחב (Space-Time A*) הופעל במתכנן המרכזי.", 'corridor');
+            } else {
+                btnToggleCorridors.className = "px-3.5 py-2 rounded-xl font-bold text-xs bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 transition flex items-center";
+                corridorToggleLabel.textContent = "שריון מסדרונות זמן-מרחב: כבוי";
+                if (reservationTable) reservationTable.clear();
+                agents.forEach(a => { a.corridorQueue = []; if (a.state === 'CORRIDOR') a.state = 'CRUISE'; });
+                logDecision("שריון מסדרונות זמן-מרחב כובה — המרכז יבצע הזזה נקודתית בלבד.", 'escalate');
+            }
+            updateDashboard();
+            draw();
+        });
+
+        sliderAgents.addEventListener('input', (e) => {
+            numAgents = parseInt(e.target.value);
+            valAgents.textContent = `${numAgents} מנופים`;
+            updateCalibrationDisplay();
+        });
+        sliderAgents.addEventListener('change', initSimulation);
+
+        sliderGrid.addEventListener('input', (e) => {
+            gridSize = parseInt(e.target.value);
+            valGrid.textContent = `${gridSize}x${gridSize}`;
+            const maxAllowed = Math.floor(gridSize * gridSize * 0.65);
+            sliderAgents.max = maxAllowed;
+            if (numAgents > maxAllowed) {
+                numAgents = maxAllowed;
+                sliderAgents.value = numAgents;
+                valAgents.textContent = `${numAgents} מנופים`;
+            }
+            updateCalibrationDisplay();
+        });
+        sliderGrid.addEventListener('change', initSimulation);
+
+        sliderTurnPenalty.addEventListener('input', (e) => {
+            turnDelaySteps = parseInt(e.target.value);
+            valTurnPenalty.textContent = `${turnDelaySteps} צעדים`;
+            updateCalibrationDisplay();
+            agents.forEach(a => a.recalculatePath());
+            updateDashboard();
+        });
+        sliderAgents.addEventListener('change', initSimulation);
+
+        sliderGrid.addEventListener('input', (e) => {
+            gridSize = parseInt(e.target.value);
+            valGrid.textContent = `${gridSize}x${gridSize}`;
+            const maxAllowed = Math.floor(gridSize * gridSize * 0.65);
+            sliderAgents.max = maxAllowed;
+            if (numAgents > maxAllowed) {
+                numAgents = maxAllowed;
+                sliderAgents.value = numAgents;
+                valAgents.textContent = `${numAgents} מנופים`;
+            }
+        });
+        sliderGrid.addEventListener('change', initSimulation);
+
+        sliderTurnPenalty.addEventListener('input', (e) => {
+            turnDelaySteps = parseInt(e.target.value);
+            valTurnPenalty.textContent = `${turnDelaySteps} צעדים`;
+            agents.forEach(a => a.recalculatePath());
+        });
+
+        sliderCorridorHorizon.addEventListener('input', (e) => {
+            corridorHorizon = parseInt(e.target.value);
+            valCorridorHorizon.textContent = `${corridorHorizon} צעדים`;
+        });
+
+        sliderDensity.addEventListener('input', (e) => {
+            densityThreshold = parseInt(e.target.value) / 100.0;
+            valDensity.textContent = `${e.target.value}%`;
+        });
+
+        sliderSpeed.addEventListener('input', (e) => {
+            simSpeed = parseInt(e.target.value);
+            const labels = ['', 'איטית (x1)', 'רגילה (x2)', 'מהירה (x3)', 'גבוהה (x4)', 'טורבו (x5)'];
+            valSpeed.textContent = labels[simSpeed];
+        });
+
+        chkShowPaths.addEventListener('change', draw);
+        chkShowCorridors.addEventListener('change', draw);
+
+        // ============================================================================
+        // CSV EXPORT (UTF-8 WITH BOM FOR HEBREW EXCEL)
+        // ============================================================================
+        function downloadCsvWithBom(filename, headers, rows) {
+            const BOM = "\uFEFF";
+            const csvContent = BOM + [
+                headers.join(","),
+                ...rows.map(r => r.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+            ].join("\r\n");
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        btnExportLiveCsv.addEventListener('click', () => {
+            if (liveStepTelemetry.length === 0) {
+                logDecision("אין עדיין נתוני ריצה לייצוא. הפעל את הסימולציה לכמה צעדים תחילה.");
+                return;
+            }
+            const headers = [
+                "צעד סימולציה (Step)",
+                "זמן אמת מצטבר (שניות)",
+                "זמן לצעד מכויל dt (שניות)",
+                "אלגוריתם ניווט (Mode)",
+                "שריון מסדרונות זמן-מרחב",
+                "אופק שריון מסדרון (H)",
+                "מספר מנופים (Robots)",
+                "גודל רשת (Grid)",
+                "צפיפות רשת (%)",
+                "קנס פנייה (Ticks)",
+                "מנופים במסדרון משוריין",
+                "תאים משוריינים בזמן-מרחב",
+                "הסלמות בצעד נוכחי",
+                "סה״כ הסלמות למרכז",
+                "קצב הסלמות לדקה (Escalations/Min)",
+                "סה״כ הסלמות חוזרות",
+                "צעדי מסדרון מוגנים",
+                "פינויי ציר למסדרון",
+                "המתנות Waze בצעד",
+                "מעקפים בצעד",
+                "פניות 90 מעלות בצעד",
+                "סה״כ משימות שהושלמו",
+                "צעדים ממוצע למשימה",
+                "זמן ממוצע למשימה (שניות - בסיס 12.0s)",
+                "תפוקת רובוט אפקטיבית (משימות/שעה - בסיס 300)",
+                "תפוקת מערכת כוללת (משימות/שעה)",
+                "תפוקה תיאורטית ללא פקקים (N*300 משימות/שעה)"
+            ];
+            const rows = liveStepTelemetry.map(r => [
+                r.step,
+                r.elapsedRealSec,
+                r.dtStepSec,
+                r.mode === 'MIN_TURN' ? 'מינימום פניות (L)' : 'ניווט זיגזג',
+                r.corridorsEnabled === 'ACTIVE' ? 'פעיל' : 'כבוי',
+                r.corridorHorizon,
+                r.activeAgents,
+                r.gridSize,
+                r.gridDensityPct,
+                r.turnPenaltyTicks,
+                r.activeCorridorAgents,
+                r.reservedSpaceTimeSlots,
+                r.stepEscalations,
+                r.cumulativeEscalations,
+                r.escalationsPerMin,
+                r.cumulativeRepeatEscalations,
+                r.preventedRepeats,
+                r.corridorYields,
+                r.stepWaits,
+                r.stepDetours,
+                r.stepTurns,
+                r.completedTasks,
+                r.avgCycleSteps,
+                r.avgTaskTimeSec,
+                r.effectiveRobotTasksPerHr,
+                r.systemTasksPerHour,
+                r.idealTasksPerHour
+            ]);
+            downloadCsvWithBom(`asrs_calibrated_telemetry_${numAgents}robots_${gridSize}x${gridSize}.csv`, headers, rows);
+            logDecision(`קובץ הלוג המכויל (${liveStepTelemetry.length} שורות) יוצא בהצלחה ל-CSV.`, 'corridor');
+        });
+
+        btnExportBenchCsv.addEventListener('click', () => {
+            if (benchmarkResults.length === 0) return;
+            const headers = [
+                "תצורת מערכת (Series)",
+                "אלגוריתם ניווט",
+                "שריון מסדרונות זמן-מרחב",
+                "מספר רובוטים",
+                "צפיפות רשת (%)",
+                "גודל רשת",
+                "זמן לצעד מכויל dt (שניות)",
+                "קנס פנייה (צעדים)",
+                "אופק שריון מסדרון (H)",
+                "קצב הסלמות למרכז לדקה (Escalations/Min)",
+                "הסלמות חוזרות לדקה",
+                "זמן ממוצע להשלמת משימה (שניות - בסיס 12.0s)",
+                "תפוקה אפקטיבית לרובוט בודד (משימות/שעה)",
+                "תפוקת מערכת כוללת בפועל (משימות/שעה)",
+                "תפוקה תיאורטית ליניארית (N*300 משימות/שעה)",
+                "יעילות צי (%)"
+            ];
+            const rows = benchmarkResults.map(b => [
+                b.seriesLabel,
+                b.mode === 'MIN_TURN' ? 'מינימום פניות (קווי L)' : 'ניווט זיגזג',
+                b.useCorridors ? 'פעיל (Space-Time A*)' : 'כבוי (הסלמה בסיסית)',
+                b.robotCount,
+                b.densityPct,
+                `${b.gridSize}x${b.gridSize}`,
+                b.dtStepSec,
+                b.turnPenalty,
+                b.horizon,
+                b.escalationsPerMin,
+                b.repeatEscalationsPerMin,
+                b.avgTaskTimeSec,
+                b.effectiveRobotTasksPerHr,
+                b.systemTasksPerHour,
+                b.idealTasksPerHour,
+                b.fleetEfficiencyPct
+            ]);
+            downloadCsvWithBom(`asrs_calibrated_benchmark_${gridSize}x${gridSize}.csv`, headers, rows);
+            logDecision("טבלת סיכום מבחן העומסים המכויל (300 משימות/שעה לרובוט) הורדה בהצלחה.", 'corridor');
+        });
+
+        // ============================================================================
+        // HEADLESS SIMULATION RUNNER FOR AUTO-BENCHMARK SWEEP (CALIBRATED TO 300 TASKS/HR)
+        // ============================================================================
+        function runHeadlessTrial(robotCount, testMode, testUseCorridors, stepsToRun = 240) {
+            const gSize = gridSize;
+            const tDelay = turnDelaySteps;
+            const dThresh = densityThreshold;
+            const cHorizon = corridorHorizon;
+
+            const cal = computeKinematicCalibration(gSize, tDelay);
+            const dtSec = cal.dtSec;
+            const totalRealSec = stepsToRun * dtSec;
+
+            const simResTable = new SpaceTimeReservationTable();
+            const simAgents = [];
+            const usedStarts = new Set();
+
+            for (let i = 0; i < robotCount; i++) {
+                let s, t, att = 0;
+                do {
+                    s = { x: Math.floor(Math.random() * gSize), y: Math.floor(Math.random() * gSize) };
+                    t = { x: Math.floor(Math.random() * gSize), y: Math.floor(Math.random() * gSize) };
+                    att++;
+                } while ((usedStarts.has(`${s.x},${s.y}`) || (Math.abs(s.x - t.x) + Math.abs(s.y - t.y) < 3)) && att < 100);
+                usedStarts.add(`${s.x},${s.y}`);
+
+                const ag = {
+                    id: i,
+                    x: s.x,
+                    y: s.y,
+                    targetX: t.x,
+                    targetY: t.y,
+                    currentAxis: null,
+                    turnTimer: 0,
+                    waitTime: 0,
+                    missionSteps: 0,
+                    missionEscalations: 0,
+                    corridorQueue: [],
+                    path: []
+                };
+                ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, null, testMode, gSize, tDelay);
+                simAgents.push(ag);
+            }
+
+            let finished = 0;
+            let sumCycleSteps = 0;
+            let escalations = 0;
+            let repeatEscalations = 0;
+            let corridorYields = 0;
+
+            for (let st = 1; st <= stepsToRun; st++) {
+                simResTable.pruneOldSteps(st);
+                const posMap = new Map();
+                for (let a of simAgents) posMap.set(`${a.x},${a.y}`, a);
+
+                const reservedSoon = new Set();
+                if (testUseCorridors) {
+                    for (let k = st; k <= st + 2; k++) {
+                        const vm = simResTable.vertexReservations.get(k);
+                        if (vm) for (let [ck] of vm) reservedSoon.add(ck);
+                    }
+                }
+
+                const escalatedPool = [];
+                const ordered = [...simAgents].sort((a, b) => {
+                    const ac = (a.corridorQueue && a.corridorQueue.length > 0) ? 1 : 0;
+                    const bc = (b.corridorQueue && b.corridorQueue.length > 0) ? 1 : 0;
+                    return bc - ac;
+                });
+
+                for (let ag of ordered) {
+                    ag.missionSteps++;
+
+                    if (ag.x === ag.targetX && ag.y === ag.targetY) {
+                        finished++;
+                        sumCycleSteps += ag.missionSteps;
+                        simResTable.clearAgentReservation(ag.id);
+                        let nt, att = 0;
+                        do {
+                            nt = { x: Math.floor(Math.random() * gSize), y: Math.floor(Math.random() * gSize) };
+                            att++;
+                        } while ((Math.abs(nt.x - ag.x) + Math.abs(nt.y - ag.y) < 4) && att < 40);
+                        ag.targetX = nt.x;
+                        ag.targetY = nt.y;
+                        ag.missionSteps = 0;
+                        ag.missionEscalations = 0;
+                        ag.waitTime = 0;
+                        ag.corridorQueue = [];
+                        ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, null, testMode, gSize, tDelay, reservedSoon);
+                        continue;
+                    }
+
+                    // Execute Protected Space-Time Corridor Step
+                    if (testUseCorridors && ag.corridorQueue && ag.corridorQueue.length > 0) {
+                        const slot = ag.corridorQueue[0];
+                        if (slot.x === ag.x && slot.y === ag.y) {
+                            ag.corridorQueue.shift();
+                            ag.currentAxis = slot.axis;
+                            ag.waitTime = 0;
+                            if (ag.corridorQueue.length === 0) {
+                                ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, null, testMode, gSize, tDelay, reservedSoon);
+                            }
+                            continue;
+                        }
+
+                        const nKey = `${slot.x},${slot.y}`;
+                        const occ = posMap.get(nKey);
+                        if (!occ || occ.id === ag.id) {
+                            posMap.delete(`${ag.x},${ag.y}`);
+                            ag.x = slot.x;
+                            ag.y = slot.y;
+                            ag.currentAxis = slot.axis;
+                            posMap.set(nKey, ag);
+                            ag.corridorQueue.shift();
+                            ag.waitTime = 0;
+                            if (ag.corridorQueue.length === 0) {
+                                ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, null, testMode, gSize, tDelay, reservedSoon);
+                            }
+                            continue;
+                        } else {
+                            // Force blocker to yield to protected corridor
+                            const dirs = [
+                                { dx: 1, dy: 0, axis: 'X' },
+                                { dx: -1, dy: 0, axis: 'X' },
+                                { dx: 0, dy: 1, axis: 'Y' },
+                                { dx: 0, dy: -1, axis: 'Y' }
+                            ];
+                            let yielded = false;
+                            for (let d of dirs) {
+                                const yx = occ.x + d.dx;
+                                const yy = occ.y + d.dy;
+                                const yKey = `${yx},${yy}`;
+                                if (yx >= 0 && yx < gSize && yy >= 0 && yy < gSize && !posMap.has(yKey) && !simResTable.isReservedByOther(st, yx, yy, occ.id)) {
+                                    posMap.delete(nKey);
+                                    occ.x = yx;
+                                    occ.y = yy;
+                                    occ.currentAxis = d.axis;
+                                    occ.turnTimer = 0;
+                                    occ.path = planPath(occ.x, occ.y, occ.currentAxis, occ.targetX, occ.targetY, null, testMode, gSize, tDelay, reservedSoon);
+                                    posMap.set(yKey, occ);
+                                    corridorYields++;
+                                    yielded = true;
+                                    break;
+                                }
+                            }
+                            if (yielded) {
+                                posMap.delete(`${ag.x},${ag.y}`);
+                                ag.x = slot.x;
+                                ag.y = slot.y;
+                                ag.currentAxis = slot.axis;
+                                posMap.set(nKey, ag);
+                                ag.corridorQueue.shift();
+                                ag.waitTime = 0;
+                                if (ag.corridorQueue.length === 0) {
+                                    ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, null, testMode, gSize, tDelay, reservedSoon);
+                                }
+                                continue;
+                            } else {
+                                ag.corridorQueue = [];
+                                simResTable.clearAgentReservation(ag.id);
+                            }
+                        }
+                    }
+
+                    if (ag.turnTimer > 0) {
+                        ag.turnTimer--;
+                        if (ag.turnTimer > 0) continue;
+                    }
+
+                    if (ag.path.length === 0) {
+                        ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, null, testMode, gSize, tDelay, reservedSoon);
+                        if (ag.path.length === 0) continue;
+                    }
+
+                    let neighbors = 0;
+                    for (let other of simAgents) {
+                        if (other.id !== ag.id && (Math.abs(ag.x - other.x) + Math.abs(ag.y - other.y) <= 2)) {
+                            neighbors++;
+                        }
+                    }
+                    const locDensity = Math.min(1.0, (neighbors / 12.0) * (1 + ag.waitTime * 0.18));
+
+                    if (locDensity > dThresh && ag.waitTime >= 2) {
+                        escalatedPool.push(ag);
+                        continue;
+                    }
+
+                    const nextStep = ag.path[0];
+                    const nextKey = `${nextStep.x},${nextStep.y}`;
+                    const blockedByCorr = testUseCorridors && (
+                        simResTable.isReservedByOther(st, nextStep.x, nextStep.y, ag.id) ||
+                        simResTable.isReservedByOther(st + 1, nextStep.x, nextStep.y, ag.id)
+                    );
+
+                    if (!blockedByCorr && ag.currentAxis !== null && nextStep.axis !== ag.currentAxis) {
+                        ag.currentAxis = nextStep.axis;
+                        ag.turnTimer = tDelay - 1;
+                        continue;
+                    }
+
+                    if (posMap.has(nextKey) || blockedByCorr) {
+                        ag.waitTime++;
+                        if (blockedByCorr && !posMap.has(nextKey)) {
+                            corridorYields++;
+                            continue;
+                        }
+                        const blocker = posMap.get(nextKey);
+                        if (testUseCorridors && blocker && blocker.corridorQueue && blocker.corridorQueue.length > 0 && ag.waitTime <= 5) {
+                            continue;
+                        }
+                        const bNext = blocker && blocker.path.length > 0 ? blocker.path[0] : null;
+                        const headOn = bNext && bNext.x === ag.x && bNext.y === ag.y;
+
+                        if (headOn || ag.waitTime > 4) {
+                            escalatedPool.push(ag);
+                            continue;
+                        }
+
+                        const estWait = (blocker && blocker.turnTimer > 0 ? blocker.turnTimer : 1) + 1;
+                        const detourPath = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, new Set([nextKey]), 'MIN_TURN', gSize, tDelay, reservedSoon);
+                        if (detourPath.length > 0) {
+                            const curTurns = countTurnsInPath(ag.currentAxis, ag.path);
+                            const detTurns = countTurnsInPath(ag.currentAxis, detourPath);
+                            const curCost = ag.path.length + curTurns * tDelay + estWait;
+                            const detCost = detourPath.length + detTurns * tDelay;
+                            if (detCost < curCost && locDensity < dThresh * 0.85) {
+                                ag.path = detourPath;
+                                ag.waitTime = 0;
+                            }
+                        }
+                    } else {
+                        posMap.delete(`${ag.x},${ag.y}`);
+                        ag.x = nextStep.x;
+                        ag.y = nextStep.y;
+                        ag.currentAxis = nextStep.axis;
+                        ag.path.shift();
+                        posMap.set(`${ag.x},${ag.y}`, ag);
+                        ag.waitTime = 0;
+                    }
+                }
+
+                // Handle Escalations in Headless Run
+                if (escalatedPool.length > 0) {
+                    for (let ag of escalatedPool) {
+                        escalations++;
+                        if (ag.missionEscalations > 0) repeatEscalations++;
+                        ag.missionEscalations++;
+
+                        if (testUseCorridors) {
+                            const timeline = simResTable.planSpaceTimeCorridor(ag, st, cHorizon, gSize, tDelay, testMode, posMap);
+                            if (timeline.length > 0) {
+                                ag.corridorQueue = timeline;
+                                ag.waitTime = 0;
+                                ag.turnTimer = 0;
+                            } else {
+                                ag.waitTime = 0;
+                            }
+                        } else {
+                            // Naive central nudge without corridor protection (causes cascading secondary conflicts)
+                            const occ = new Set(simAgents.map(a => `${a.x},${a.y}`));
+                            const dirs = [
+                                { dx: 1, dy: 0, axis: 'X' },
+                                { dx: -1, dy: 0, axis: 'X' },
+                                { dx: 0, dy: 1, axis: 'Y' },
+                                { dx: 0, dy: -1, axis: 'Y' }
+                            ];
+                            for (let d of dirs) {
+                                const nx = ag.x + d.dx;
+                                const ny = ag.y + d.dy;
+                                const k = `${nx},${ny}`;
+                                if (nx >= 0 && nx < gSize && ny >= 0 && ny < gSize && !occ.has(k)) {
+                                    occ.delete(`${ag.x},${ag.y}`);
+                                    posMap.delete(`${ag.x},${ag.y}`);
+                                    ag.x = nx;
+                                    ag.y = ny;
+                                    ag.currentAxis = d.axis;
+                                    occ.add(k);
+                                    posMap.set(k, ag);
+                                    break;
+                                }
+                            }
+                            ag.waitTime = 1; // Residual friction in unreserved zone
+                            ag.path = planPath(ag.x, ag.y, ag.currentAxis, ag.targetX, ag.targetY, occ, testMode, gSize, tDelay);
+                        }
+                    }
+                }
+            }
+
+            const densityPct = Number(((robotCount / (gSize * gSize)) * 100).toFixed(1));
+            const escalationsPerMin = Number(((escalations / totalRealSec) * 60.0).toFixed(1));
+            const repeatEscalationsPerMin = Number(((repeatEscalations / totalRealSec) * 60.0).toFixed(1));
+
+            const avgCycleSteps = finished > 0
+                ? (sumCycleSteps / finished)
+                : (stepsToRun * 1.15);
+            const avgTaskTimeSec = Number((avgCycleSteps * dtSec).toFixed(2));
+            const effectiveRobotTasksPerHr = avgTaskTimeSec > 0
+                ? Number(Math.min(315, 3600.0 / avgTaskTimeSec).toFixed(1))
+                : TARGET_ROBOT_TASKS_PER_HOUR;
+
+            const systemTasksPerHour = Math.round((finished / totalRealSec) * 3600.0);
+            const idealTasksPerHour = robotCount * TARGET_ROBOT_TASKS_PER_HOUR;
+            const fleetEfficiencyPct = idealTasksPerHour > 0
+                ? Math.min(100, Math.round((systemTasksPerHour / idealTasksPerHour) * 100))
+                : 100;
+
+            let seriesKey = `${testMode}_${testUseCorridors ? 'CORR' : 'NAIVE'}`;
+            let seriesLabel = '';
+            if (testMode === 'MIN_TURN' && testUseCorridors) seriesLabel = 'עם שריון מסדרונות (Space-Time A* + קווי L)';
+            else if (testMode === 'MIN_TURN' && !testUseCorridors) seriesLabel = 'ללא שריון מסדרונות (הסלמה בסיסית + קווי L)';
+            else seriesLabel = 'ניווט זיגזג (אשליית אלכסון)';
+
+            return {
+                seriesKey,
+                seriesLabel,
+                mode: testMode,
+                useCorridors: testUseCorridors,
+                robotCount,
+                densityPct,
+                gridSize: gSize,
+                dtStepSec: Number(dtSec.toFixed(3)),
+                turnPenalty: tDelay,
+                horizon: cHorizon,
+                escalationsPerMin,
+                repeatEscalationsPerMin,
+                avgCycleSteps: Number(avgCycleSteps.toFixed(1)),
+                avgTaskTimeSec,
+                effectiveRobotTasksPerHr,
+                systemTasksPerHour,
+                idealTasksPerHour,
+                fleetEfficiencyPct,
+                corridorYieldsPerMin: Number(((corridorYields / totalRealSec) * 60.0).toFixed(1))
+            };
+        }
+
+        // ============================================================================
+        // CHART.JS ENGINEERING CHARTS & AUTOMATED INSIGHTS (PHYSICAL UNITS)
+        // ============================================================================
+        function initCharts() {
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Heebo', sans-serif";
+
+            const commonOptions = (yLabel) => ({
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: '#e2e8f0', font: { size: 11, weight: 'bold' } }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleColor: '#fbbf24',
+                        bodyColor: '#f1f5f9',
+                        borderColor: '#334155',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'מספר רובוטים (% צפיפות רשת)', color: '#cbd5e1', font: { size: 11 } },
+                        grid: { color: 'rgba(51, 65, 85, 0.35)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: yLabel, color: '#cbd5e1', font: { size: 11 } },
+                        grid: { color: 'rgba(51, 65, 85, 0.35)' }
+                    }
+                }
+            });
+
+            chartEscalationsInst = new Chart(document.getElementById('chartEscalations'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: commonOptions('קצב הסלמות למרכז לדקה (Escalations/Min)')
+            });
+
+            chartCycleTimeInst = new Chart(document.getElementById('chartCycleTime'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: commonOptions('זמן משימה ממוצע בשניות (בסיס = 12.0 שנ׳)')
+            });
+
+            chartThroughputInst = new Chart(document.getElementById('chartThroughput'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: commonOptions('תפוקת מערכת כוללת (משימות לשעה)')
+            });
+        }
+
+        function renderBenchmarkChartsAndInsights() {
+            const corrSeries = benchmarkResults.filter(r => r.seriesKey === 'MIN_TURN_CORR').sort((a, b) => a.robotCount - b.robotCount);
+            const naiveSeries = benchmarkResults.filter(r => r.seriesKey === 'MIN_TURN_NAIVE').sort((a, b) => a.robotCount - b.robotCount);
+            const zigzagSeries = benchmarkResults.filter(r => r.seriesKey.startsWith('ZIGZAG')).sort((a, b) => a.robotCount - b.robotCount);
+
+            const primarySeries = corrSeries.length > 0 ? corrSeries : (naiveSeries.length > 0 ? naiveSeries : zigzagSeries);
+            const labels = primarySeries.map(d => `${d.robotCount} (${d.densityPct}%)`);
+
+            const makeDataset = (label, dataArr, color, bgColor, dashed = false) => ({
+                label,
+                data: dataArr,
+                borderColor: color,
+                backgroundColor: bgColor,
+                borderWidth: 2.5,
+                borderDash: dashed ? [6, 4] : [],
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.3,
+                fill: !dashed
+            });
+
+            const escDatasets = [];
+            const cycDatasets = [];
+            const tputDatasets = [];
+
+            // Add Ideal Theoretical Baseline on Graph 2 (12.0s) and Graph 3 (N * 300 tasks/hr)
+            if (primarySeries.length > 0) {
+                cycDatasets.push({
+                    label: 'זמן בסיס ללא הפרעות (12.0 שנ׳ = 300/שעה)',
+                    data: primarySeries.map(() => 12.0),
+                    borderColor: 'rgba(148, 163, 184, 0.55)',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    fill: false
+                });
+                tputDatasets.push({
+                    label: 'פוטנציאל ליניארי תיאורטי (N × 300 משימות/שעה)',
+                    data: primarySeries.map(d => d.idealTasksPerHour),
+                    borderColor: 'rgba(148, 163, 184, 0.5)',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 2,
+                    fill: false
+                });
+            }
+
+            if (corrSeries.length > 0) {
+                escDatasets.push(makeDataset('עם שריון מסדרונות (Space-Time A*)', corrSeries.map(d => d.escalationsPerMin), '#fbbf24', 'rgba(251, 191, 36, 0.14)', false));
+                cycDatasets.push(makeDataset('עם שריון מסדרונות (Space-Time A*)', corrSeries.map(d => d.avgTaskTimeSec), '#22d3ee', 'rgba(34, 211, 238, 0.14)', false));
+                tputDatasets.push(makeDataset('תפוקה בפועל: עם שריון מסדרונות', corrSeries.map(d => d.systemTasksPerHour), '#10b981', 'rgba(16, 185, 129, 0.16)', false));
+            }
+            if (naiveSeries.length > 0) {
+                escDatasets.push(makeDataset('ללא שריון מסדרונות (הסלמה בסיסית)', naiveSeries.map(d => d.escalationsPerMin), '#f43f5e', 'rgba(244, 63, 94, 0.08)', true));
+                cycDatasets.push(makeDataset('ללא שריון מסדרונות (הסלמה בסיסית)', naiveSeries.map(d => d.avgTaskTimeSec), '#fb7185', 'rgba(251, 113, 133, 0.08)', true));
+                tputDatasets.push(makeDataset('תפוקה בפועל: ללא שריון מסדרונות', naiveSeries.map(d => d.systemTasksPerHour), '#f97316', 'rgba(249, 115, 22, 0.08)', true));
+            }
+            if (zigzagSeries.length > 0) {
+                escDatasets.push(makeDataset('ניווט זיגזג (אלכסון)', zigzagSeries.map(d => d.escalationsPerMin), '#a855f7', 'rgba(168, 85, 247, 0.06)', true));
+                cycDatasets.push(makeDataset('ניווט זיגזג (אלכסון)', zigzagSeries.map(d => d.avgTaskTimeSec), '#c084fc', 'rgba(192, 132, 252, 0.06)', true));
+                tputDatasets.push(makeDataset('תפוקה בפועל: ניווט זיגזג', zigzagSeries.map(d => d.systemTasksPerHour), '#a855f7', 'rgba(168, 85, 247, 0.06)', true));
+            }
+
+            chartEscalationsInst.data.labels = labels;
+            chartEscalationsInst.data.datasets = escDatasets;
+            chartEscalationsInst.update();
+
+            chartCycleTimeInst.data.labels = labels;
+            chartCycleTimeInst.data.datasets = cycDatasets;
+            chartCycleTimeInst.update();
+
+            chartThroughputInst.data.labels = labels;
+            chartThroughputInst.data.datasets = tputDatasets;
+            chartThroughputInst.update();
+
+            // Compute Automated Insights in Physical Units (Tasks/Hour & Seconds)
+            if (primarySeries.length > 0) {
+                let peakPt = primarySeries[0];
+                for (let pt of primarySeries) {
+                    if (pt.systemTasksPerHour > peakPt.systemTasksPerHour) peakPt = pt;
+                }
+                insightSweetSpot.textContent = `${peakPt.robotCount} מנופים ⇐ ${peakPt.systemTasksPerHour.toLocaleString()} משימות/שעה`;
+                insightSweetSpotSub.textContent = `בנקודת השיא כל רובוט מבצע ${peakPt.effectiveRobotTasksPerHr} משימות/שעה (${peakPt.avgTaskTimeSec} שנ׳ למשימה, ${peakPt.fleetEfficiencyPct}% יעילות צי).`;
+
+                let breakdownPt = primarySeries.find(d => d.avgTaskTimeSec >= 18.0 || d.escalationsPerMin >= 14) || primarySeries[primarySeries.length - 1];
+                insightBreakdown.textContent = `החל מ-${breakdownPt.robotCount} מנופים (${breakdownPt.densityPct}% צפיפות)`;
+                insightBreakdownSub.textContent = `זמן המשימה מתארך מ-12.0 שנ׳ ל-${breakdownPt.avgTaskTimeSec} שנ׳ (${breakdownPt.escalationsPerMin} הסלמות/דקה למרכז).`;
+
+                if (corrSeries.length > 0 && naiveSeries.length > 0) {
+                    const totalEscCorr = corrSeries.reduce((s, d) => s + d.escalationsPerMin, 0);
+                    const totalEscNaive = naiveSeries.reduce((s, d) => s + d.escalationsPerMin, 0);
+                    const escReductionPct = totalEscNaive > 0
+                        ? Math.round(((totalEscNaive - totalEscCorr) / totalEscNaive) * 100)
+                        : 0;
+
+                    const peakCorr = Math.max(...corrSeries.map(d => d.systemTasksPerHour));
+                    const peakNaive = Math.max(...naiveSeries.map(d => d.systemTasksPerHour));
+                    const extraTasksPerHr = Math.max(0, peakCorr - peakNaive);
+
+                    insightCorridorGain.textContent = `+${extraTasksPerHr.toLocaleString()} משימות/שעה בשיא | -${escReductionPct}% הסלמות`;
+                    insightCorridorGainSub.textContent = `שריון מסדרונות זמן-מרחב שומר על זמן משימה קרוב ל-12.0 שנ׳ גם בצפיפות גבוהה.`;
+                } else if (corrSeries.length > 0 && zigzagSeries.length > 0) {
+                    const peakMin = Math.max(...corrSeries.map(d => d.systemTasksPerHour));
+                    const peakZig = Math.max(...zigzagSeries.map(d => d.systemTasksPerHour));
+                    const diffTasks = Math.max(0, peakMin - peakZig);
+                    insightCorridorGain.textContent = `+${diffTasks.toLocaleString()} משימות/שעה לקווי L מול זיגזג`;
+                    insightCorridorGainSub.textContent = `ניווט זיגזג מאריך דרסטית את זמן המשימה מעבר ל-12.0 שניות בגלל בלימות של 90 מעלות.`;
+                }
+            }
+        }
+
+        // Run Automated Benchmark Sweep
+        btnRunBenchmark.addEventListener('click', () => {
+            isRunning = false;
+            systemStatusText.textContent = "מריץ Benchmark...";
+            statusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping";
+
+            const countsToTest = [6, 10, 14, 18, 22, 26, 32, 38, 44].filter(c => c < gridSize * gridSize * 0.72);
+            const benchOption = selBenchmarkMode.value;
+
+            let configs = [];
+            if (benchOption === 'CORRIDOR_VS_NAIVE') {
+                configs = [
+                    { mode: 'MIN_TURN', useCorr: true },
+                    { mode: 'MIN_TURN', useCorr: false }
+                ];
+            } else if (benchOption === 'MINTURN_VS_ZIGZAG') {
+                configs = [
+                    { mode: 'MIN_TURN', useCorr: true },
+                    { mode: 'ZIGZAG', useCorr: true }
+                ];
+            } else {
+                configs = [
+                    { mode: 'MIN_TURN', useCorr: true },
+                    { mode: 'MIN_TURN', useCorr: false },
+                    { mode: 'ZIGZAG', useCorr: true }
+                ];
+            }
+
+            const tasks = [];
+            for (let cfg of configs) {
+                for (let c of countsToTest) {
+                    tasks.push({ mode: cfg.mode, useCorr: cfg.useCorr, count: c });
+                }
+            }
+
+            benchmarkResults = [];
+            benchProgressWrap.classList.remove('hidden');
+            btnRunBenchmark.disabled = true;
+            btnExportBenchCsv.disabled = true;
+
+            let idx = 0;
+
+            function nextBenchmarkStep() {
+                if (idx >= tasks.length) {
+                    benchProgressLabel.textContent = "מבחן העומסים הושלם בהצלחה!";
+                    benchProgressPct.textContent = "100%";
+                    benchProgressBar.style.width = "100%";
+                    btnRunBenchmark.disabled = false;
+                    btnExportBenchCsv.disabled = false;
+                    systemStatusText.textContent = "מוכן (Benchmark הושלם)";
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+                    renderBenchmarkChartsAndInsights();
+                    logDecision(`הושלם Benchmark השוואתי מלא (${tasks.length} הרצות). הגרפים עודכנו למטה.`, 'corridor');
+                    document.getElementById('benchmark-analytics-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    return;
+                }
+
+                const t = tasks[idx];
+                const pct = Math.round(((idx + 1) / tasks.length) * 100);
+                const desc = t.useCorr ? 'עם שריון מסדרון' : 'ללא שריון מסדרון';
+                benchProgressLabel.textContent = `מריץ: ${t.count} מנופים (${desc} - ${t.mode === 'MIN_TURN' ? 'קווי L' : 'זיגזג'})...`;
+                benchProgressPct.textContent = `${pct}%`;
+                benchProgressBar.style.width = `${pct}%`;
+
+                setTimeout(() => {
+                    const res = runHeadlessTrial(t.count, t.mode, t.useCorr, 210);
+                    benchmarkResults.push(res);
+                    idx++;
+                    nextBenchmarkStep();
+                }, 15);
+            }
+
+            nextBenchmarkStep();
+        });
+
+        // Snapshot current live simulation into charts
+        btnSnapshotToChart.addEventListener('click', () => {
+            if (stepCount < 15) {
+                logDecision("הרץ את הסימולציה החיה לפחות 15 צעדים לפני דגימת הנתונים לגרף.");
+                return;
+            }
+            const elapsedSec = stepCount * dtStepSeconds;
+            const densityPct = Number(((numAgents / (gridSize * gridSize)) * 100).toFixed(1));
+            const escalationsPerMin = Number(((metrics.totalEscalations / elapsedSec) * 60.0).toFixed(1));
+            const repeatEscalationsPerMin = Number(((metrics.repeatEscalations / elapsedSec) * 60.0).toFixed(1));
+
+            const avgCycleSteps = metrics.finishedMissions > 0
+                ? (metrics.totalCycleSteps / metrics.finishedMissions)
+                : calibratedBaseSteps;
+            const avgTaskTimeSec = Number((avgCycleSteps * dtStepSeconds).toFixed(2));
+            const effectiveRobotTasksPerHr = avgTaskTimeSec > 0
+                ? Number(Math.min(315, 3600.0 / avgTaskTimeSec).toFixed(1))
+                : TARGET_ROBOT_TASKS_PER_HOUR;
+
+            const systemTasksPerHour = Math.round((metrics.finishedMissions / elapsedSec) * 3600.0);
+            const idealTasksPerHour = numAgents * TARGET_ROBOT_TASKS_PER_HOUR;
+            const fleetEfficiencyPct = idealTasksPerHour > 0
+                ? Math.min(100, Math.round((systemTasksPerHour / idealTasksPerHour) * 100))
+                : 100;
+
+            const seriesKey = `${routingMode}_${useSpaceTimeCorridors ? 'CORR' : 'NAIVE'}`;
+            const seriesLabel = useSpaceTimeCorridors
+                ? 'עם שריון מסדרונות (Space-Time A*)'
+                : 'ללא שריון מסדרונות (הסלמה בסיסית)';
+
+            benchmarkResults = benchmarkResults.filter(r => !(r.seriesKey === seriesKey && r.robotCount === numAgents));
+            benchmarkResults.push({
+                seriesKey,
+                seriesLabel,
+                mode: routingMode,
+                useCorridors: useSpaceTimeCorridors,
+                robotCount: numAgents,
+                densityPct,
+                gridSize,
+                dtStepSec: Number(dtStepSeconds.toFixed(3)),
+                turnPenalty: turnDelaySteps,
+                horizon: corridorHorizon,
+                escalationsPerMin,
+                repeatEscalationsPerMin,
+                avgCycleSteps: Number(avgCycleSteps.toFixed(1)),
+                avgTaskTimeSec,
+                effectiveRobotTasksPerHr,
+                systemTasksPerHour,
+                idealTasksPerHour,
+                fleetEfficiencyPct,
+                corridorYieldsPerMin: Number(((metrics.corridorYields / elapsedSec) * 60.0).toFixed(1))
+            });
+
+            btnExportBenchCsv.disabled = false;
+            renderBenchmarkChartsAndInsights();
+            logDecision(`נדגמה ריצה חיה (${numAgents} מנופים: ${systemTasksPerHour.toLocaleString()} משימות/שעה, ${avgTaskTimeSec} שנ׳ למשימה) והתווספה לגרפים.`, 'corridor');
+        });
+
+        window.onload = () => {
+            initCharts();
+            initSimulation();
+            requestAnimationFrame(animationLoop);
+        };
+    </script>
+</body>
+</html>
